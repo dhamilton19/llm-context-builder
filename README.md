@@ -2,6 +2,8 @@
 
 Prepare, preview and package any local codebase for large‑language‑model conversations with a few clicks.
 
+![Screenshot showing the home page](./screenshot.png)
+
 > **TL;DR** – Paste or type a local directory path, press **Load**, cherry‑pick files & folders, then copy an XML‑wrapped snippet ready to drop into ChatGPT or Claude. The page URL is updated with `?dirPath=` so you can bookmark specific directories.
 
 **⚠️ LOCAL ONLY** – This app runs locally and reads from your local file system. It cannot be deployed to hosting platforms.
@@ -24,15 +26,15 @@ Prepare, preview and package any local codebase for large‑language‑model con
 
 ## Features
 
-| Area                   | Highlights                                                                                                                                                 |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Directory loading**  | Paste local path into the input. Reads directly from your local file system. `.gitignore` rules respected. *File paths must be pasted due to web security restrictions preventing folder pickers from returning full paths.* |
-| **Deep‑linking**       | `?dirPath=` query param auto‑populates the input. Bookmarkable URLs for specific directories.                                                              |
-| **Smart selection**    | Shift‑click folders to include every nested file; checkboxes propagate upward when all children are selected.                                              |
-| **Keyboard shortcuts** | <kbd>⌘/Ctrl</kbd> + <kbd>A</kbd> (select all), <kbd>⌘/Ctrl</kbd> + <kbd>C</kbd> (copy), <kbd>⌘/Ctrl</kbd> + <kbd>F</kbd> (filter), <kbd>Esc</kbd> (clear). |
-| **Live preview**       | Instant XML preview with file counts, line counts and token estimate.                                                                                      |
-| **Local file access**  | Requires Node.js server environment to read local file system. Cannot run on static hosting platforms.                                                     |
-| **Copy → Clipboard**   | One click copies the XML payload ready for your AI chat.                                                                                                   |
+| Area                   | Highlights                                                                                                                                                                                                                   |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Directory loading**  | Paste local path into the input. Reads directly from your local file system. `.gitignore` rules respected. _File paths must be pasted due to web security restrictions preventing folder pickers from returning full paths._ |
+| **Deep‑linking**       | `?dirPath=` query param auto‑populates the input. Bookmarkable URLs for specific directories.                                                                                                                                |
+| **Smart selection**    | Shift‑click folders to include every nested file; checkboxes propagate upward when all children are selected.                                                                                                                |
+| **Keyboard shortcuts** | <kbd>⌘/Ctrl</kbd> + <kbd>A</kbd> (select all), <kbd>⌘/Ctrl</kbd> + <kbd>C</kbd> (copy), <kbd>⌘/Ctrl</kbd> + <kbd>F</kbd> (filter), <kbd>Esc</kbd> (clear).                                                                   |
+| **Live preview**       | Instant XML preview with file counts, line counts and token estimate.                                                                                                                                                        |
+| **Local file access**  | Requires Node.js server environment to read local file system. Cannot run on static hosting platforms.                                                                                                                       |
+| **Copy → Clipboard**   | One click copies the XML payload ready for your AI chat.                                                                                                                                                                     |
 
 ---
 
