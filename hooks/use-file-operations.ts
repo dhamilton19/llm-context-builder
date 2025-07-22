@@ -61,7 +61,8 @@ export function useFileOperations({
       if (res.ok) {
         setTree({ name: dirPath, children: data });
         setSelections(new Set());
-        setExpandedDirs(new Set());
+        // Expand root directory by default
+        setExpandedDirs(new Set([dirPath]));
       } else {
         setError(data.error || "Unable to read directory");
       }

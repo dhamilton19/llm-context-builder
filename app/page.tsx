@@ -38,6 +38,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [previewContent, setPreviewContent] = useState<string>("");
   const [loadingPreview, setLoadingPreview] = useState(false);
+  const clearingDirectory = useRef(false);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -235,7 +236,20 @@ export default function Home() {
           });
         };
 
-        const clickedNode = findNode(tree.children, path);
+        // Check if this is the root directory
+        let clickedNode: FileNodeType | null = null;
+        if (path === dirPath) {
+          // This is the root directory
+          clickedNode = {
+            name: dirPath.split("/").pop() || dirPath,
+            path: dirPath,
+            type: "directory",
+            children: tree.children,
+          };
+        } else {
+          clickedNode = findNode(tree.children, path);
+        }
+
         if (!clickedNode) return next;
 
         if (next.has(path)) {
@@ -280,9 +294,11 @@ export default function Home() {
           []
         );
 
-      setSelections(new Set(gather(tree.children)));
+      // Include the root directory path along with all children
+      const allPaths = [dirPath, ...gather(tree.children)];
+      setSelections(new Set(allPaths));
     }
-  }, [tree, selections.size]);
+  }, [tree, selections.size, dirPath]);
 
   const expandAll = useCallback(() => {
     if (!tree) return;
@@ -299,8 +315,10 @@ export default function Home() {
       }, []);
     };
 
-    setExpandedDirs(new Set(getAllDirPaths(tree.children)));
-  }, [tree]);
+    // Include the root directory along with all children directories
+    const allDirPaths = [dirPath, ...getAllDirPaths(tree.children)];
+    setExpandedDirs(new Set(allDirPaths));
+  }, [tree, dirPath]);
 
   const collapseAll = useCallback(() => {
     setExpandedDirs(new Set());
@@ -333,26 +351,8 @@ export default function Home() {
   const getButtonText = useCallback(() => {
     if (copySuccess) return "Copied!";
     if (loading) return "Preparing...";
-    if (selections.size === 0) return "Select files to copy";
-
-    // Count actual files vs folders
-    const fileCount = selectedFileCount;
-    const folderCount = selections.size - selectedFileCount;
-
-    if (selections.size === 1) {
-      return fileCount === 1 ? "Copy 1 file" : "Copy 1 folder";
-    }
-
-    if (folderCount === 0) {
-      return `Copy ${fileCount} file${fileCount === 1 ? "" : "s"}`;
-    } else if (fileCount === 0) {
-      return `Copy ${folderCount} folder${folderCount === 1 ? "" : "s"}`;
-    } else {
-      return `Copy ${fileCount} file${
-        fileCount === 1 ? "" : "s"
-      } + ${folderCount} folder${folderCount === 1 ? "" : "s"}`;
-    }
-  }, [copySuccess, loading, selections.size, selectedFileCount]);
+    return "Copy";
+  }, [copySuccess, loading]);
 
   const filterNodes = useCallback(
     (
@@ -372,11 +372,13 @@ export default function Home() {
           const hasMatchingChildren = result.filtered.length > 0;
 
           if (matches || hasMatchingChildren) {
-            filtered.push({ ...node, children: result.filtered });
+            // If the directory itself matches, include ALL its children (not just filtered ones)
+            const childrenToShow = matches ? node.children : result.filtered;
+            filtered.push({ ...node, children: childrenToShow });
             pathsToExpand.push(...result.pathsToExpand);
 
-            // If this directory contains matches, it should be expanded
-            if (hasMatchingChildren) {
+            // If this directory matches or contains matches, it should be expanded
+            if (matches || hasMatchingChildren) {
               pathsToExpand.push(node.path);
             }
           }
@@ -420,6 +422,10 @@ export default function Home() {
 
   // Load directory from URL on mount
   useEffect(() => {
+    if (clearingDirectory.current) {
+      clearingDirectory.current = false;
+      return;
+    }
     const urlDirPath = searchParams.get("dirPath");
     if (urlDirPath && urlDirPath !== dirPath) {
       setDirPath(urlDirPath);
@@ -428,6 +434,9 @@ export default function Home() {
 
   // Auto-load directory when dirPath is set from URL
   useEffect(() => {
+    if (clearingDirectory.current) {
+      return;
+    }
     const urlDirPath = searchParams.get("dirPath");
     if (urlDirPath && urlDirPath === dirPath && dirPath.trim() && !tree) {
       loadDirectory();
@@ -443,21 +452,27 @@ export default function Home() {
   }, [error]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-8 px-4 sm:px-6 lg:px-8">
-      <div className="mx-auto w-full max-w-7xl space-y-6">
-        {/* Header */}
-        <div className="text-center space-y-2">
-          <h1 className="text-4xl font-semibold tracking-tight text-gray-900">
-            LLM Context Builder
-          </h1>
-          <p className="text-lg text-gray-600 font-medium">
-            Prepare your code for AI conversations
-          </p>
+    <div className="h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col overflow-hidden">
+      {/* Top Navigation Bar */}
+      <div className="bg-white border-b border-gray-300/60 shadow-sm flex-shrink-0">
+        <div className="px-4 sm:px-6">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center space-x-4">
+              <h1 className="text-xl font-semibold tracking-tight text-gray-900">
+                LLM Context Builder
+              </h1>
+              <span className="text-sm text-gray-600 font-medium hidden sm:block">
+                Prepare your code for AI conversations
+              </span>
+            </div>
+          </div>
         </div>
+      </div>
 
+      <div className="flex-1 flex flex-col overflow-hidden">
         {/* Error Banner */}
         {error && (
-          <div className="rounded-xl bg-red-50 border border-red-200 p-4">
+          <div className="mx-4 sm:mx-6 mb-4 mt-4 rounded-xl bg-red-50 border border-red-200 p-4 flex-shrink-0">
             <div className="flex items-center">
               <div className="flex-shrink-0">
                 <div className="w-2 h-2 bg-red-400 rounded-full"></div>
@@ -469,78 +484,76 @@ export default function Home() {
           </div>
         )}
 
-        {/* Directory Input */}
-        <Card className="p-6 bg-white/80 backdrop-blur-xl border-0 shadow-xl">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-semibold text-gray-700">
-                Project Directory
-              </label>
-              {/* <Button
-                variant="secondary"
-                onClick={loadTestData}
-                className="text-xs font-medium"
-              >
-                Load Sample Project
-              </Button> */}
-            </div>
+        {/* Main Content */}
+        <div className="grid grid-cols-5 flex-1 min-h-0">
+          {!filteredTree ? (
+            /* No Directory Loaded - Show Directory Input in Left Panel */
+            <>
+              {/* Left Panel - Directory Input */}
+              <Card className="col-span-2 p-6 bg-gray-50/90 backdrop-blur-xl border-0 shadow-lg rounded-none border-r border-gray-300/60">
+                <div className="flex flex-col justify-center h-full space-y-6">
+                  <div className="text-center">
+                    <label className="text-sm font-semibold text-gray-700">
+                      Project Directory
+                    </label>
+                  </div>
 
-            <div className="relative flex gap-3 rounded-2xl border-2 border-dashed border-gray-300 hover:border-gray-400 p-6 transition-all duration-20 items-center">
-              <input
-                type="text"
-                placeholder="/Users/you/Projects"
-                value={dirPath}
-                onChange={(e) => setDirPath(e.target.value)}
-                onPaste={handlePaste}
-                onKeyDown={handleKeyDown}
-                className="flex-1 bg-transparent text-base font-mono placeholder-gray-400 focus:outline-none"
-              />
+                  <div className="relative flex flex-col gap-3 rounded-2xl border-2 border-dashed border-gray-300 hover:border-gray-400 p-6 transition-all duration-200">
+                    <input
+                      type="text"
+                      placeholder="/Users/you/Projects"
+                      value={dirPath}
+                      onChange={(e) => setDirPath(e.target.value)}
+                      onPaste={handlePaste}
+                      onKeyDown={handleKeyDown}
+                      className="bg-transparent text-base font-mono placeholder-gray-400 focus:outline-none text-center"
+                    />
 
-              <Button
-                onClick={loadDirectory}
-                disabled={loading || !dirPath.trim()}
-                className="shrink-0 font-medium"
-                size="sm"
-              >
-                <FolderOpen size={16} />
-                {loading ? "Loading..." : "Load"}
-              </Button>
-            </div>
+                    <Button
+                      onClick={loadDirectory}
+                      disabled={loading || !dirPath.trim()}
+                      className="w-full font-medium"
+                    >
+                      <FolderOpen size={16} />
+                      {loading ? "Loading..." : "Load Directory"}
+                    </Button>
+                  </div>
 
-            <div className="flex items-center gap-2 text-xs text-gray-500">
-              <Command size={12} />
-              <span>Type or paste full folder path</span>
-            </div>
-          </div>
-        </Card>
+                  <div className="flex flex-col items-center gap-2 text-xs text-gray-500">
+                    <Command size={12} />
+                    <span className="text-center">
+                      Type or paste full folder path
+                    </span>
+                  </div>
+                </div>
+              </Card>
 
-        {/* Main Content - Always Two Columns When Tree Exists */}
-        {filteredTree && (
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            {/* File Browser */}
-            <Card className="p-6 bg-white/80 backdrop-blur-xl border-0 shadow-xl">
-              {/* Controls */}
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-3">
-                  <Button
-                    variant="secondary"
-                    onClick={expandAll}
-                    size="sm"
-                    className="font-medium"
-                  >
-                    Expand All
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={collapseAll}
-                    size="sm"
-                    className="font-medium"
-                  >
-                    Collapse All
-                  </Button>
-
+              {/* Right Content - Welcome Message */}
+              <Card className="col-span-3 p-6 bg-white border-0 shadow-lg rounded-none">
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center">
+                    <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
+                      <FolderOpen size={24} className="text-gray-400" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                      Select a Project Directory
+                    </h3>
+                    <p className="text-gray-600">
+                      Choose a directory to browse and select files for your AI
+                      context
+                    </p>
+                  </div>
+                </div>
+              </Card>
+            </>
+          ) : (
+            /* Directory Loaded - Show File Browser and Preview */
+            <>
+              {/* File Browser */}
+              <div className="col-span-2 flex flex-col min-h-0">
+                <Card className="flex-1 p-6 bg-gray-50/95 backdrop-blur-xl border-0 shadow-lg rounded-none border-r border-gray-300/60 flex flex-col min-h-0">
                   {/* Search */}
-                  <div className="relative">
+                  <div className="relative mb-2">
                     <Search
                       size={16}
                       className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
@@ -551,7 +564,7 @@ export default function Home() {
                       placeholder="Filter files..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10 pr-10 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full pl-10 pr-10 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                     {searchQuery && (
                       <button
@@ -577,140 +590,209 @@ export default function Home() {
                       </button>
                     )}
                   </div>
-                </div>
 
-                <Button
-                  variant="secondary"
-                  onClick={toggleAll}
-                  size="sm"
-                  className="font-medium"
-                >
-                  {selections.size ? "Clear All" : "Select All"}
-                </Button>
-              </div>
-
-              {/* File Tree */}
-              <div className="max-h-[60vh] min-h-[60vh] overflow-auto rounded-xl border border-gray-100 bg-gray-50/50">
-                <FileTree
-                  nodes={filteredTree.children}
-                  toggleSelect={toggleSelect}
-                  selections={selections}
-                  expandedDirs={expandedDirs}
-                  setExpandedDirs={setExpandedDirs}
-                  searchQuery={searchQuery}
-                />
-              </div>
-
-              {/* Copy Button */}
-              <div className="mt-6 flex justify-center">
-                <Button
-                  onClick={copyToClipboard}
-                  disabled={loading || selections.size === 0}
-                  className={cn(
-                    "font-semibold transition-all duration-200",
-                    copySuccess && "bg-green-600 hover:bg-green-700",
-                    "min-w-72"
-                  )}
-                >
-                  <Copy size={16} />
-                  {getButtonText()}
-                </Button>
-              </div>
-
-              {/* Keyboard Shortcuts Hint */}
-              <div className="mt-4 flex items-center justify-center gap-4 text-xs text-gray-500">
-                <div className="flex items-center gap-1">
-                  <kbd className="px-2 py-1 bg-gray-100 rounded text-xs font-mono">
-                    ⌘A
-                  </kbd>
-                  <span>Select All</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <kbd className="px-2 py-1 bg-gray-100 rounded text-xs font-mono">
-                    ⌘C
-                  </kbd>
-                  <span>Copy</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <kbd className="px-2 py-1 bg-gray-100 rounded text-xs font-mono">
-                    ⌘F
-                  </kbd>
-                  <span>Search</span>
-                </div>
-              </div>
-            </Card>
-
-            {/* Preview Panel - Always Visible */}
-            <Card className="p-6 bg-white/80 backdrop-blur-xl border-0 shadow-xl">
-              <div className="flex items-center gap-2 mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Context Preview
-                </h3>
-              </div>
-
-              <div className="mt-8 max-h-[60vh] min-h-[60vh] overflow-auto rounded-xl border border-gray-200 bg-gray-50">
-                {loadingPreview ? (
-                  <div className="flex items-center justify-center py-12">
-                    <div className="text-center">
-                      <div className="w-8 h-8 mx-auto mb-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                      <p className="text-sm text-gray-600">
-                        Loading preview...
-                      </p>
+                  {/* Tree Controls */}
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <Button
+                        variant="secondary"
+                        onClick={expandAll}
+                        size="sm"
+                        className="font-medium"
+                      >
+                        Expand All
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        onClick={collapseAll}
+                        size="sm"
+                        className="font-medium"
+                      >
+                        Collapse All
+                      </Button>
                     </div>
+
+                    <Button
+                      variant="secondary"
+                      onClick={toggleAll}
+                      size="sm"
+                      className="font-medium"
+                    >
+                      {selections.size ? "Clear All" : "Select All"}
+                    </Button>
                   </div>
-                ) : selections.size === 0 ? (
-                  <div className="flex items-center justify-center py-12 text-gray-500">
-                    <div className="text-center">
-                      <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
-                        <Eye size={24} className="text-gray-400" />
+
+                  {/* File Tree */}
+                  <div className="flex-1 overflow-auto rounded-lg border border-gray-300/50 bg-white/60 backdrop-blur-sm min-h-0">
+                    <FileTree
+                      nodes={filteredTree.children}
+                      toggleSelect={toggleSelect}
+                      selections={selections}
+                      expandedDirs={expandedDirs}
+                      setExpandedDirs={setExpandedDirs}
+                      searchQuery={searchQuery}
+                      rootPath={dirPath}
+                      onClearDirectory={() => {
+                        clearingDirectory.current = true;
+                        setDirPath("");
+                        setTree(null);
+                        setSelections(new Set());
+                        setExpandedDirs(new Set());
+                        setPreviewContent("");
+                        setError(null);
+                        // Clear URL parameters after state is cleared
+                        router.replace("/");
+                      }}
+                    />
+                  </div>
+                </Card>
+              </div>
+
+              {/* Preview Panel - Always Visible */}
+              <div className="col-span-3 flex flex-col min-h-0">
+                <Card className="flex-1 p-6 bg-white border-0 shadow-lg rounded-none flex flex-col min-h-0">
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      Context Preview
+                    </h3>
+                    {previewContent && (
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 px-4 py-2 bg-gray-50/80 backdrop-blur-sm rounded-xl border border-gray-200/60">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                            <span className="text-sm font-medium text-gray-700">
+                              {selectedFileCount} file
+                              {selectedFileCount !== 1 ? "s" : ""}
+                              {selections.size > selectedFileCount &&
+                                ` (+ ${
+                                  selections.size - selectedFileCount
+                                } folder${
+                                  selections.size - selectedFileCount !== 1
+                                    ? "s"
+                                    : ""
+                                })`}
+                            </span>
+                          </div>
+                          <div className="h-4 w-px bg-gray-300"></div>
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-gray-400"></div>
+                            <span className="text-sm font-medium text-gray-600">
+                              {previewContent
+                                .split("\n")
+                                .length.toLocaleString()}{" "}
+                              lines
+                            </span>
+                          </div>
+                          <div className="h-4 w-px bg-gray-300"></div>
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                            <span className="text-sm font-medium text-gray-600">
+                              ~
+                              {Math.ceil(
+                                previewContent.length / 4
+                              ).toLocaleString()}{" "}
+                              tokens
+                            </span>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSelections(new Set());
+                            setPreviewContent("");
+                          }}
+                          className="h-8 w-8 p-0 hover:bg-gray-100 text-gray-400 hover:text-gray-600"
+                        >
+                          <svg
+                            width="14"
+                            height="14"
+                            viewBox="0 0 14 14"
+                            fill="none"
+                          >
+                            <path
+                              d="M10.5 3.5L3.5 10.5M3.5 3.5L10.5 10.5"
+                              stroke="currentColor"
+                              strokeWidth="1.5"
+                              strokeLinecap="round"
+                            />
+                          </svg>
+                        </Button>
                       </div>
-                      <p className="font-medium text-gray-700">
-                        Select files to preview
-                      </p>
-                      <p className="text-sm text-gray-500 mt-1">
-                        Choose files from the tree to see their content here
-                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex-1 mt-8 overflow-auto rounded-lg border border-gray-300/60 bg-gray-50/80 backdrop-blur-sm">
+                    {loadingPreview ? (
+                      <div className="flex items-center justify-center py-12">
+                        <div className="text-center">
+                          <div className="w-8 h-8 mx-auto mb-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                          <p className="text-sm text-gray-600">
+                            Loading preview...
+                          </p>
+                        </div>
+                      </div>
+                    ) : selections.size === 0 ? (
+                      <div className="flex items-center justify-center h-full text-gray-500">
+                        <div className="text-center">
+                          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
+                            <Eye size={24} className="text-gray-400" />
+                          </div>
+                          <p className="font-medium text-gray-700">
+                            Select files to preview
+                          </p>
+                          <p className="text-sm text-gray-500 mt-1">
+                            Choose files from the tree to see their content here
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <pre className="p-4 text-xs font-mono text-gray-800 whitespace-pre-wrap overflow-x-auto leading-relaxed">
+                        {previewContent || "No content to preview"}
+                      </pre>
+                    )}
+                  </div>
+
+                  {/* Copy Button and Keyboard Shortcuts */}
+                  <div className="mt-6 flex items-center justify-between">
+                    <Button
+                      onClick={copyToClipboard}
+                      disabled={loading || selections.size === 0}
+                      className={cn(
+                        "font-semibold transition-all duration-200",
+                        copySuccess && "bg-green-600 hover:bg-green-700",
+                        "min-w-64"
+                      )}
+                    >
+                      <Copy size={16} /> {getButtonText()}
+                    </Button>
+
+                    <div className="flex items-center gap-4 text-xs text-gray-500">
+                      <div className="flex items-center gap-1">
+                        <kbd className="px-2 py-1 bg-gray-100 rounded text-xs font-mono">
+                          ⌘A
+                        </kbd>
+                        <span>Select All</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <kbd className="px-2 py-1 bg-gray-100 rounded text-xs font-mono">
+                          ⌘C
+                        </kbd>
+                        <span>Copy</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <kbd className="px-2 py-1 bg-gray-100 rounded text-xs font-mono">
+                          ⌘F
+                        </kbd>
+                        <span>Search</span>
+                      </div>
                     </div>
                   </div>
-                ) : (
-                  <pre className="p-4 text-xs font-mono text-gray-800 whitespace-pre-wrap overflow-x-auto leading-relaxed">
-                    {previewContent || "No content to preview"}
-                  </pre>
-                )}
+                </Card>
               </div>
-              {previewContent && (
-                <div className="mt-4 flex items-center justify-between text-xs text-gray-500 bg-gray-50 rounded-lg p-3">
-                  <div className="flex items-center gap-4">
-                    <span className="font-medium">
-                      {selections.size > 0 && (
-                        <>
-                          {selectedFileCount} file
-                          {selectedFileCount !== 1 ? "s" : ""}
-                          {selections.size > selectedFileCount &&
-                            ` (+ ${selections.size - selectedFileCount} folder${
-                              selections.size - selectedFileCount !== 1
-                                ? "s"
-                                : ""
-                            })`}
-                        </>
-                      )}
-                    </span>
-                    <span className="font-medium">
-                      {previewContent.split("\n").length} lines
-                    </span>
-                    <span>
-                      {previewContent.length.toLocaleString()} characters
-                    </span>
-                  </div>
-                  <span className="font-medium text-blue-600">
-                    ~{Math.ceil(previewContent.length / 4).toLocaleString()}{" "}
-                    tokens
-                  </span>
-                </div>
-              )}
-            </Card>
-          </div>
-        )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

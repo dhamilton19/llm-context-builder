@@ -21,6 +21,8 @@ interface FileTreeProps {
   expandedDirs: Set<string>
   setExpandedDirs: React.Dispatch<React.SetStateAction<Set<string>>>
   searchQuery?: string
+  rootPath?: string
+  onClearDirectory?: () => void
 }
 
 export default function FileTree({
@@ -30,6 +32,8 @@ export default function FileTree({
   expandedDirs,
   setExpandedDirs,
   searchQuery = "",
+  rootPath,
+  onClearDirectory,
 }: FileTreeProps) {
   if (!nodes?.length) {
     return (
@@ -49,10 +53,41 @@ export default function FileTree({
     )
   }
 
+  // Sort nodes: directories first (alphabetically), then files (alphabetically)
+  const sortedNodes = [...nodes].sort((a, b) => {
+    // First, sort by type (directories before files)
+    if (a.type !== b.type) {
+      return a.type === "directory" ? -1 : 1;
+    }
+    // Then, sort alphabetically within the same type
+    return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+  });
+
   return (
     <div className="p-4">
       <ul className="space-y-1">
-        {nodes.map((node) => (
+        {/* Root directory node */}
+        {rootPath && (
+          <FileNode
+            key={rootPath}
+            node={{
+              name: rootPath.split('/').pop() || rootPath,
+              path: rootPath,
+              type: "directory",
+              children: sortedNodes
+            }}
+            toggleSelect={toggleSelect}
+            selections={selections}
+            expandedDirs={expandedDirs}
+            setExpandedDirs={setExpandedDirs}
+            searchQuery={searchQuery}
+            isRoot={true}
+            onClearDirectory={onClearDirectory}
+          />
+        )}
+        
+        {/* Only show regular nodes if no root path (this prevents duplication) */}
+        {!rootPath && sortedNodes.map((node) => (
           <FileNode
             key={node.path}
             node={node}
