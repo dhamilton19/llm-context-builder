@@ -1,12 +1,12 @@
 # LLM Context Builder
 
-Prepare, preview and package any local codebase for large‑language‑model conversations with a few clicks.
+A powerful desktop app for preparing, previewing, and packaging any local codebase for large-language-model conversations. Built with Electron for native file system access and zero configuration.
 
-![Screenshot showing the home page](./screenshot.png)
+![Screenshot showing the LLM Context Builder interface](./screenshot.png)
 
-> **TL;DR** – Paste or type a local directory path, press **Load**, cherry‑pick files & folders, then copy an XML‑wrapped snippet ready to drop into ChatGPT or Claude. The page URL is updated with `?dirPath=` so you can bookmark specific directories.
+> **TL;DR** – Pick a project folder, select files using an intuitive tree interface, and copy a perfectly formatted XML snippet—ready for ChatGPT, Claude, or any LLM.
 
-**⚠️ LOCAL ONLY** – This app runs locally and reads from your local file system. It cannot be deployed to hosting platforms.
+**🖥️ NATIVE DESKTOP APP** – Gitignore-aware, keyboard-friendly, beautifully responsive, with deep macOS integration.
 
 ---
 
@@ -14,122 +14,201 @@ Prepare, preview and package any local codebase for large‑language‑model con
 
 1. [Features](#features)
 2. [Quick Start](#quick-start)
-3. [Folder Structure](#folder-structure)
-4. [UI/UX Details](#uiux-details)
-5. [Tech Stack](#tech-stack)
-6. [Configuration](#configuration)
-7. [Roadmap](#roadmap)
-8. [Contributing](#contributing)
-9. [License](#license)
+3. [macOS Launch Instructions](#macos-launch-instructions)
+4. [Desktop Features](#desktop-features)
+5. [Folder Structure](#folder-structure)
+6. [UI/UX Details](#uiux-details)
+7. [Tech Stack](#tech-stack)
+8. [Building & Distribution](#building--distribution)
+9. [Contributing](#contributing)
+10. [License](#license)
 
 ---
 
 ## Features
 
-| Area                   | Highlights                                                                                                                                                                                                                   |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Directory loading**  | Paste local path into the input. Reads directly from your local file system. `.gitignore` rules respected. _File paths must be pasted due to web security restrictions preventing folder pickers from returning full paths._ |
-| **Deep‑linking**       | `?dirPath=` query param auto‑populates the input. Bookmarkable URLs for specific directories.                                                                                                                                |
-| **Smart selection**    | Shift‑click folders to include every nested file; checkboxes propagate upward when all children are selected.                                                                                                                |
-| **Keyboard shortcuts** | <kbd>⌘/Ctrl</kbd> + <kbd>A</kbd> (select all), <kbd>⌘/Ctrl</kbd> + <kbd>C</kbd> (copy), <kbd>⌘/Ctrl</kbd> + <kbd>F</kbd> (filter), <kbd>Esc</kbd> (clear).                                                                   |
-| **Live preview**       | Instant XML preview with file counts, line counts and token estimate.                                                                                                                                                        |
-| **Local file access**  | Requires Node.js server environment to read local file system. Cannot run on static hosting platforms.                                                                                                                       |
-| **Copy → Clipboard**   | One click copies the XML payload ready for your AI chat.                                                                                                                                                                     |
+| Area                      | Highlights                                                                                           |
+| ------------------------- | ---------------------------------------------------------------------------------------------------- |
+| **Native File Access**    | Browse directories using the OS file picker. No security restrictions. Remembers recent directories. |
+| **Smart Tree Navigation** | Expandable tree view. Select folders to include all contents. Checkboxes propagate intelligently.    |
+| **Gitignore Integration** | Respects `.gitignore`. Filters noise while preserving selections.                                    |
+| **File Type Filtering**   | Filter by extension with visual indicators and keyboard control.                                     |
+| **Live Preview**          | Syntax-highlighted XML preview with live updates, line counts, token estimates, and structure.       |
+| **Menu Bar Integration**  | Native macOS menus: ⌘O to open, plus Edit/View/Window.                                               |
+| **Clipboard Export**      | One-click copy of formatted XML, ready for LLM prompts.                                              |
+| **Keyboard Shortcuts**    | Familiar shortcuts: ⌘O (open), ⌘F (search), ⌘C (copy).                                               |
 
 ---
 
 ## Quick Start
 
-```sh
-# 1. Clone
-$ git clone https://github.com/your‑org/llm‑context‑builder.git
-$ cd llm‑context‑builder
+```bash
+# Clone the repo
+git clone https://github.com/your-org/llm-context-builder.git
+cd llm-context-builder
 
-# 2. Install deps (use pnpm / yarn / npm as you prefer)
-$ pnpm install
+# Install dependencies
+npm install
 
-# 3. Run dev server (MUST run locally - requires Node.js server)
-$ pnpm dev
-
-# 4. Open in browser
-#    http://localhost:3000  ➜  paste a local directory path, hit **Load**
+# Start the app in development mode
+npm run electron-dev
 ```
 
-> **Note**: This app MUST run locally on your machine since it needs Node.js server access to read your local file system. Unfortunately, file paths must be manually pasted due to web security restrictions that prevent folder picker APIs from returning full file paths.
+To build a distributable version:
 
-### Production build (local only)
-
-```sh
-$ pnpm build && pnpm start
+```bash
+npm run build-electron
 ```
 
-**Important**: Even in production, this app requires a Node.js server environment and cannot be deployed to static hosting platforms like Vercel, Netlify, or GitHub Pages since it needs server-side file system access.
+---
+
+## macOS Launch Instructions
+
+The app is **not code-signed**, so macOS may block it at first launch. To allow it:
+
+### First Launch
+
+1. Locate the `.app` (e.g., `dist/mac/LLM Context Builder.app`).
+2. Right-click the app in Finder and choose **Open**.
+3. Confirm the dialog by clicking **Open**.
+
+### After That
+
+You can open it normally from Finder or Launchpad.
+
+If you still have trouble:
+
+```bash
+xattr -d com.apple.quarantine "LLM Context Builder.app"
+```
+
+> ⚠️ The app requests no sensitive permissions. It only accesses files you select.
+
+---
+
+## Desktop Features
+
+### File System Access
+
+- OS-native folder picker
+- No browser sandbox limitations
+- Recents tracked and editable
+
+### macOS Native Integration
+
+- File/Edit/View/Window menus
+- Keyboard shortcuts (⌘O, ⌘F, etc.)
+- Dock icon with live state
+
+### File Tree
+
+- Expand/collapse folders
+- Folder-level select-all
+- Keyboard accessible
+
+### Preview
+
+- Instant XML output
+- Syntax highlighting
+- Token and line estimates
 
 ---
 
 ## Folder Structure
 
 ```
-app/                 ➜ Next 13/14 app‑router source
-  api/               ➜ Edge‑compatible File APIs
-  components/        ➜ Re‑usable UI (FileTree, FileNode, etc.)
-  hooks/             ➜ Custom React hooks
-  ...
-lib/                 ➜ Shared utilities (clsx, gitignore parser)
-public/
+electron/               → Electron main process
+  main.js              → App entry
+  preload.js           → Secure IPC bridge
+
+app/                   → Next.js frontend
+  page.tsx             → Main UI
+  globals.css          → Tailwind styles
+
+components/            → React components
+  file-tree.tsx        → Tree navigation
+  filter-popup.tsx     → File filtering
+  recent-paths.tsx     → Recent projects
+
+hooks/                 → Custom hooks
+  use-file-operations.tsx → File system logic
+
+lib/                   → Utilities
+  utils.ts             → Filtering logic
+  file-types.ts        → File type detection
+  recent-paths.ts      → Recents storage
+
+public/                → Static assets
+  logo.png             → App icon
 ```
-
-Full tree available in the [files panel](#) once the app is running.
-
----
-
-## UI/UX Details
-
-- **Tailwind CSS** with custom CSS variables for light/dark.
-- **Framer Motion** for smooth tree expand/collapse.
-- **Lucide‑react** icons.
-- **Radix UI primitives** under the hood.
-- **Token estimate** is _chars ÷ 4_ – good enough for GPT‑4o sizing.
 
 ---
 
 ## Tech Stack
 
-| Layer      | Choice                                                   |
-| ---------- | -------------------------------------------------------- |
-| Framework  | **Next 15 app‑router** (React 19, Server Actions ready)  |
-| Styling    | **Tailwind CSS** + **shadcn/ui**                         |
-| Animation  | **Framer Motion**                                        |
-| Icons      | **Lucide‑react**                                         |
-| State      | React hooks + `useSearchParams`                          |
-| API Routes | Node.js server routes (TypeScript, requires `fs` access) |
+| Layer         | Stack                              |
+| ------------- | ---------------------------------- |
+| Desktop Shell | Electron 37                        |
+| Frontend      | Next.js 15 + React 19 + TypeScript |
+| Styling       | Tailwind CSS                       |
+| UI Components | shadcn/ui + Radix UI               |
+| Icons         | Lucide React                       |
+| File Access   | Node.js `fs` via Electron          |
 
 ---
 
-## Configuration
+## Building & Distribution
 
-### Environment variables
+```bash
+# Dev mode
+npm run electron-dev
 
-Since this is a local-only application, minimal configuration is needed:
+# Build Next.js app
+npm run build
 
-| Variable | Purpose                               | Default |
-| -------- | ------------------------------------- | ------- |
-| `PORT`   | Port for the local development server | `3000`  |
+# Run Electron manually
+npm run electron
+```
 
-Create a `.env.local` if you need to override the default port.
+### Production Builds
+
+```bash
+npm run build-electron    # Current platform
+npm run dist              # All platforms (requires setup)
+```
+
+Tested on:
+
+- ✅ macOS (primary)
+- ⚠️ Windows/Linux (config present, untested)
+
+> Code signing & auto-update are not included.
 
 ---
 
 ## Contributing
 
-1. Fork and clone the repo.
-2. `pnpm install`
-3. Follow existing code style (TypeScript strict, Tailwind, Prettier).
-4. Update this README + docs where helpful.
-5. Open a pull request – the CI will lint & type‑check automatically.
+```bash
+# Fork and clone
+git clone https://github.com/your-username/llm-context-builder.git
+
+# Install deps
+npm install
+
+# New feature branch
+git checkout -b feature/your-feature
+```
+
+### Guidelines
+
+- Use TypeScript strict mode
+- Tailwind for styling
+- Prettier + ESLint for formatting
+- Follow structure and design system
+- Test and document your changes
 
 ---
 
 ## License
 
-[MIT](LICENSE) © 2025
+[MIT](LICENSE) © 2025

@@ -2,11 +2,17 @@
   "name": "my-v0-project",
   "version": "0.1.0",
   "private": true,
+  "main": "electron/main.js",
+  "homepage": "./",
   "scripts": {
     "build": "next build",
     "dev": "next dev",
     "lint": "next lint",
-    "start": "next start"
+    "start": "next start",
+    "electron": "electron .",
+    "electron-dev": "NODE_ENV=development electron .",
+    "build-electron": "next build && electron-builder",
+    "dist": "npm run build-electron"
   },
   "dependencies": {
     "@emotion/is-prop-valid": "latest",
@@ -68,8 +74,32 @@
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "electron": "^37.2.3",
+    "electron-builder": "^26.0.12",
     "postcss": "^8.5",
     "tailwindcss": "^3.4.17",
     "typescript": "^5"
+  },
+  "build": {
+    "appId": "com.example.llm-context-builder",
+    "productName": "LLM Context Builder",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "out/**/*",
+      "electron/**/*",
+      "node_modules/**/*"
+    ],
+    "mac": {
+      "icon": "public/logo.png",
+      "category": "public.app-category.developer-tools"
+    },
+    "win": {
+      "icon": "public/logo.png"
+    },
+    "linux": {
+      "icon": "public/logo.png"
+    }
   }
 }

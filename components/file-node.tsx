@@ -1,34 +1,43 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { memo, useEffect, useRef } from "react"
-import { Folder, FolderOpen, FileText, FileCode, FileImage, FileVideo, FileArchive, ChevronRight } from "lucide-react"
-import { motion, AnimatePresence } from "framer-motion"
-import { cn } from "@/lib/utils"
+import { memo, useEffect, useRef } from "react";
+import {
+  Folder,
+  FolderOpen,
+  FileText,
+  FileCode,
+  FileImage,
+  FileVideo,
+  FileArchive,
+  ChevronRight,
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { cn } from "@/lib/utils";
 
 interface FileNodeType {
-  name: string
-  path: string
-  type: "file" | "directory"
-  size?: number
-  children?: FileNodeType[]
+  name: string;
+  path: string;
+  type: "file" | "directory";
+  size?: number;
+  children?: FileNodeType[];
 }
 
 interface FileNodeProps {
-  node: FileNodeType
-  toggleSelect: (path: string) => void
-  selections: Set<string>
-  level?: number
-  expandedDirs: Set<string>
-  setExpandedDirs: React.Dispatch<React.SetStateAction<Set<string>>>
-  searchQuery?: string
-  isRoot?: boolean
-  onClearDirectory?: () => void
+  node: FileNodeType;
+  toggleSelect: (path: string) => void;
+  selections: Set<string>;
+  level?: number;
+  expandedDirs: Set<string>;
+  setExpandedDirs: React.Dispatch<React.SetStateAction<Set<string>>>;
+  searchQuery?: string;
+  isRoot?: boolean;
+  onClearDirectory?: () => void;
 }
 
 const getFileIcon = (fileName: string) => {
-  const ext = fileName.split(".").pop()?.toLowerCase()
+  const ext = fileName.split(".").pop()?.toLowerCase();
 
   switch (ext) {
     case "js":
@@ -41,36 +50,36 @@ const getFileIcon = (fileName: string) => {
     case "c":
     case "go":
     case "rs":
-      return <FileCode size={16} className="text-blue-600" />
+      return <FileCode size={16} className="text-blue-600" />;
     case "png":
     case "jpg":
     case "jpeg":
     case "gif":
     case "svg":
     case "webp":
-      return <FileImage size={16} className="text-green-600" />
+      return <FileImage size={16} className="text-green-600" />;
     case "mp4":
     case "avi":
     case "mov":
     case "webm":
-      return <FileVideo size={16} className="text-purple-600" />
+      return <FileVideo size={16} className="text-purple-600" />;
     case "zip":
     case "tar":
     case "gz":
     case "rar":
-      return <FileArchive size={16} className="text-orange-600" />
+      return <FileArchive size={16} className="text-orange-600" />;
     default:
-      return <FileText size={16} className="text-gray-600" />
+      return <FileText size={16} className="text-gray-600" />;
   }
-}
+};
 
 const formatFileSize = (bytes?: number) => {
-  if (!bytes) return ""
+  if (!bytes) return "";
 
-  const sizes = ["B", "KB", "MB", "GB"]
-  const i = Math.floor(Math.log(bytes) / Math.log(1024))
-  return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${sizes[i]}`
-}
+  const sizes = ["B", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${sizes[i]}`;
+};
 
 const FileNode = memo(function FileNode({
   node,
@@ -83,73 +92,77 @@ const FileNode = memo(function FileNode({
   isRoot = false,
   onClearDirectory,
 }: FileNodeProps) {
-  const isSelected = selections.has(node.path)
-  const isExpanded = expandedDirs.has(node.path)
-  const isHighlighted = searchQuery && node.name.toLowerCase().includes(searchQuery.toLowerCase())
-  const checkboxRef = useRef<HTMLInputElement>(null)
+  const isSelected = selections.has(node.path);
+  const isExpanded = expandedDirs.has(node.path);
+  const isHighlighted =
+    searchQuery && node.name.toLowerCase().includes(searchQuery.toLowerCase());
+  const checkboxRef = useRef<HTMLInputElement>(null);
 
   // Check if directory has partial selection (some children selected, but not all)
   const getSelectionState = () => {
     if (node.type === "file") {
-      return { isSelected, isIndeterminate: false }
+      return { isSelected, isIndeterminate: false };
     }
 
     if (!node.children || node.children.length === 0) {
-      return { isSelected, isIndeterminate: false }
+      return { isSelected, isIndeterminate: false };
     }
 
     // Get all descendant paths
     const getAllDescendants = (n: FileNodeType): string[] => {
-      if (n.type === "file") return [n.path]
-      const descendants = [n.path]
+      if (n.type === "file") return [n.path];
+      const descendants = [n.path];
       if (n.children) {
         for (const child of n.children) {
-          descendants.push(...getAllDescendants(child))
+          descendants.push(...getAllDescendants(child));
         }
       }
-      return descendants
-    }
+      return descendants;
+    };
 
-    const allDescendants = getAllDescendants(node)
-    const selectedDescendants = allDescendants.filter(path => selections.has(path))
+    const allDescendants = getAllDescendants(node);
+    const selectedDescendants = allDescendants.filter((path) =>
+      selections.has(path)
+    );
 
     if (selectedDescendants.length === 0) {
-      return { isSelected: false, isIndeterminate: false }
+      return { isSelected: false, isIndeterminate: false };
     } else if (selectedDescendants.length === allDescendants.length) {
-      return { isSelected: true, isIndeterminate: false }
+      return { isSelected: true, isIndeterminate: false };
     } else {
-      return { isSelected: false, isIndeterminate: true }
+      return { isSelected: false, isIndeterminate: true };
     }
-  }
+  };
 
-  const { isSelected: actualIsSelected, isIndeterminate } = getSelectionState()
+  const { isSelected: actualIsSelected, isIndeterminate } = getSelectionState();
 
   // Set the indeterminate state on the checkbox
   useEffect(() => {
     if (checkboxRef.current) {
-      checkboxRef.current.indeterminate = isIndeterminate
+      checkboxRef.current.indeterminate = isIndeterminate;
     }
-  }, [isIndeterminate])
+  }, [isIndeterminate]);
 
   const toggleExpanded = () => {
     setExpandedDirs((prev) => {
-      const next = new Set(prev)
+      const next = new Set(prev);
       if (next.has(node.path)) {
-        next.delete(node.path)
+        next.delete(node.path);
       } else {
-        next.add(node.path)
+        next.add(node.path);
       }
-      return next
-    })
-  }
+      return next;
+    });
+  };
 
   return (
     <li>
       <div
         className={cn(
           "group flex items-center gap-2 rounded-lg py-2 px-3 transition-all duration-150 hover:bg-gray-100",
-          (actualIsSelected || isIndeterminate) && "bg-blue-50 hover:bg-blue-100",
-          isHighlighted && "ring-2 ring-yellow-200 bg-yellow-50",
+          (actualIsSelected || isIndeterminate) &&
+            "bg-blue-50 hover:bg-blue-100",
+          isHighlighted && "ring-2 ring-yellow-200 bg-yellow-50"
         )}
         style={{ paddingLeft: `${level * 1.5 + 0.75}rem` }}
       >
@@ -160,7 +173,10 @@ const FileNode = memo(function FileNode({
             onClick={toggleExpanded}
             aria-label={isExpanded ? "Collapse folder" : "Expand folder"}
           >
-            <motion.div animate={{ rotate: isExpanded ? 90 : 0 }} transition={{ duration: 0.2 }}>
+            <motion.div
+              animate={{ rotate: isExpanded ? 90 : 0 }}
+              transition={{ duration: 0.2 }}
+            >
               <ChevronRight size={14} strokeWidth={2} />
             </motion.div>
           </button>
@@ -194,7 +210,9 @@ const FileNode = memo(function FileNode({
         <span
           className={cn(
             "flex-1 select-none text-sm font-medium truncate",
-            (actualIsSelected || isIndeterminate) ? "text-blue-900" : "text-gray-900",
+            actualIsSelected || isIndeterminate
+              ? "text-blue-900"
+              : "text-gray-900"
           )}
         >
           {node.name}
@@ -220,8 +238,11 @@ const FileNode = memo(function FileNode({
             </svg>
           </button>
         ) : (
-          node.type === "file" && node.size && (
-            <span className="flex-shrink-0 text-xs text-gray-500 font-mono">{formatFileSize(node.size)}</span>
+          node.type === "file" &&
+          node.size && (
+            <span className="flex-shrink-0 text-xs text-gray-500 font-mono">
+              {formatFileSize(node.size)}
+            </span>
           )
         )}
       </div>
@@ -243,7 +264,10 @@ const FileNode = memo(function FileNode({
                   return a.type === "directory" ? -1 : 1;
                 }
                 // Then, sort alphabetically within the same type
-                return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+                return a.name.localeCompare(b.name, undefined, {
+                  numeric: true,
+                  sensitivity: "base",
+                });
               })
               .map((child) => (
                 <FileNode
@@ -261,7 +285,7 @@ const FileNode = memo(function FileNode({
         )}
       </AnimatePresence>
     </li>
-  )
-})
+  );
+});
 
-export default FileNode
+export default FileNode;

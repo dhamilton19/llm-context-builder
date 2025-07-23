@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useCallback, useState, useEffect } from "react";
+import { getRecentPaths, addRecentPath, removeRecentPath, clearRecentPaths, type RecentPath } from "@/lib/recent-paths";
 
 interface FileNodeType {
   name: string;
@@ -25,6 +25,21 @@ interface UseFileOperationsProps {
   setLoading: (loading: boolean) => void;
   setCopySuccess: (success: boolean) => void;
   setError: (error: string | null) => void;
+  setDirPath: (path: string) => void;
+}
+
+// Declare global electronAPI type
+declare global {
+  interface Window {
+    electronAPI?: {
+      showDirectoryPicker: () => Promise<string | null>;
+      getDirectoryContents: (dirPath: string) => Promise<any>;
+      readFiles: (dirPath: string, selections: string[]) => Promise<string>;
+      onDirectorySelected: (callback: (event: any, path: string) => void) => void;
+      removeDirectorySelectedListener: (callback: (event: any, path: string) => void) => void;
+      isElectron: boolean;
+    };
+  }
 }
 
 export function useFileOperations({
@@ -36,36 +51,100 @@ export function useFileOperations({
   setLoading,
   setCopySuccess,
   setError,
+  setDirPath,
 }: UseFileOperationsProps) {
-  // Router for updating the URL query string
-  const router = useRouter();
 
-  const loadDirectory = useCallback(async () => {
-    if (!dirPath.trim()) {
+  // Check if we're running in Electron
+  const isElectron = typeof window !== 'undefined' && window.electronAPI?.isElectron;
+
+  // Recent paths state
+  const [recentPaths, setRecentPaths] = useState<RecentPath[]>([]);
+
+  // Load recent paths on mount
+  useEffect(() => {
+    const paths = getRecentPaths();
+    setRecentPaths(paths);
+  }, []);
+
+  // Handle directory selection from menu
+  useEffect(() => {
+    if (!isElectron || !window.electronAPI) return;
+
+    const handleMenuDirectorySelected = async (event: any, selectedPath: string) => {
+      if (selectedPath) {
+        setDirPath(selectedPath);
+        setLoading(true);
+        setError(null);
+        
+        try {
+          const data = await window.electronAPI!.getDirectoryContents(selectedPath);
+          setTree({ name: selectedPath, children: data });
+          setSelections(new Set());
+          setExpandedDirs(new Set([selectedPath]));
+          
+          // Save to recent paths
+          addRecentPath(selectedPath);
+          setRecentPaths(getRecentPaths());
+        } catch (err) {
+          setError("Failed to load directory from menu selection");
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+
+    window.electronAPI.onDirectorySelected(handleMenuDirectorySelected);
+
+    return () => {
+      if (window.electronAPI) {
+        window.electronAPI.removeDirectorySelectedListener(handleMenuDirectorySelected);
+      }
+    };
+  }, [isElectron, setTree, setSelections, setExpandedDirs, setLoading, setError, setDirPath]);
+
+  const showDirectoryPicker = useCallback(async () => {
+    if (!isElectron || !window.electronAPI) {
+      setError("Directory picker is only available in the desktop app");
+      return;
+    }
+
+    try {
+      const selectedPath = await window.electronAPI.showDirectoryPicker();
+      if (selectedPath) {
+        return selectedPath;
+      }
+    } catch (err) {
+      setError("Failed to open directory picker");
+    }
+    return null;
+  }, [isElectron, setError]);
+
+  const loadDirectory = useCallback(async (pathToLoad?: string) => {
+    const targetPath = pathToLoad || dirPath;
+    
+    if (!targetPath.trim()) {
       setError("Please enter a directory path");
       return;
     }
 
-    // Update the URL so ?dirPath=... reflects the chosen directory
-    router.push(`/?dirPath=${encodeURIComponent(dirPath.trim())}`);
+    if (!isElectron || !window.electronAPI) {
+      setError("Directory loading is only available in the desktop app");
+      return;
+    }
 
     setLoading(true);
     setError(null);
 
     try {
-      const res = await fetch(
-        `/api/list-directory?dirPath=${encodeURIComponent(dirPath)}`
-      );
-      const data = await res.json();
-
-      if (res.ok) {
-        setTree({ name: dirPath, children: data });
-        setSelections(new Set());
-        // Expand root directory by default
-        setExpandedDirs(new Set([dirPath]));
-      } else {
-        setError(data.error || "Unable to read directory");
-      }
+      // Use native Electron API
+      const data = await window.electronAPI.getDirectoryContents(targetPath);
+      setTree({ name: targetPath, children: data });
+      setSelections(new Set());
+      setExpandedDirs(new Set([targetPath]));
+      
+      // Save to recent paths
+      addRecentPath(targetPath);
+      setRecentPaths(getRecentPaths());
     } catch (err) {
       setError(
         "Failed to load directory. Please check the path and try again."
@@ -75,12 +154,12 @@ export function useFileOperations({
     }
   }, [
     dirPath,
-    router,
     setTree,
     setSelections,
     setExpandedDirs,
     setLoading,
     setError,
+    isElectron,
   ]);
 
   const loadTestData = useCallback(() => {
@@ -213,22 +292,17 @@ export function useFileOperations({
   const copyToClipboard = useCallback(async () => {
     if (!selections.size) return;
 
+    if (!isElectron || !window.electronAPI) {
+      setError("File copying is only available in the desktop app");
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
     try {
-      const res = await fetch("/api/get-files", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          dirPath,
-          selections: Array.from(selections),
-        }),
-      });
-
-      const text = await res.text();
-      if (!res.ok) throw new Error(text);
-
+      // Use native Electron API
+      const text = await window.electronAPI.readFiles(dirPath, Array.from(selections));
       await navigator.clipboard.writeText(text);
       setCopySuccess(true);
       setTimeout(() => setCopySuccess(false), 2000);
@@ -237,11 +311,26 @@ export function useFileOperations({
     } finally {
       setLoading(false);
     }
-  }, [dirPath, selections, setLoading, setCopySuccess, setError]);
+  }, [dirPath, selections, setLoading, setCopySuccess, setError, isElectron]);
+
+  const handleRemoveRecentPath = useCallback((path: string) => {
+    removeRecentPath(path);
+    setRecentPaths(getRecentPaths());
+  }, []);
+
+  const handleClearRecentPaths = useCallback(() => {
+    clearRecentPaths();
+    setRecentPaths([]);
+  }, []);
 
   return {
     loadDirectory,
     loadTestData,
     copyToClipboard,
+    showDirectoryPicker,
+    isElectron,
+    recentPaths,
+    removeRecentPath: handleRemoveRecentPath,
+    clearRecentPaths: handleClearRecentPaths,
   };
 }

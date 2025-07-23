@@ -1,0 +1,6 @@
+ignoredBuiltDependencies:
+  - electron-winstaller
+  - sharp
+
+onlyBuiltDependencies:
+  - electron
