@@ -5,14 +5,12 @@
   "main": "electron/main.js",
   "homepage": "./",
   "scripts": {
-    "build": "next build",
     "dev": "next dev",
     "lint": "next lint",
     "start": "next start",
     "electron": "electron .",
     "electron-dev": "NODE_ENV=development electron .",
-    "build-electron": "next build && electron-builder",
-    "dist": "npm run build-electron"
+    "dist": "npm run build && electron-builder"
   },
   "dependencies": {
     "@emotion/is-prop-valid": "latest",

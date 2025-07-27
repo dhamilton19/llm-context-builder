@@ -54,8 +54,6 @@ export function useFileOperations({
   setDirPath,
 }: UseFileOperationsProps) {
 
-  // Check if we're running in Electron
-  const isElectron = typeof window !== 'undefined' && window.electronAPI?.isElectron;
 
   // Recent paths state
   const [recentPaths, setRecentPaths] = useState<RecentPath[]>([]);
@@ -68,7 +66,6 @@ export function useFileOperations({
 
   // Handle directory selection from menu
   useEffect(() => {
-    if (!isElectron || !window.electronAPI) return;
 
     const handleMenuDirectorySelected = async (event: any, selectedPath: string) => {
       if (selectedPath) {
@@ -100,13 +97,9 @@ export function useFileOperations({
         window.electronAPI.removeDirectorySelectedListener(handleMenuDirectorySelected);
       }
     };
-  }, [isElectron, setTree, setSelections, setExpandedDirs, setLoading, setError, setDirPath]);
+  }, [setTree, setSelections, setExpandedDirs, setLoading, setError, setDirPath]);
 
   const showDirectoryPicker = useCallback(async () => {
-    if (!isElectron || !window.electronAPI) {
-      setError("Directory picker is only available in the desktop app");
-      return;
-    }
 
     try {
       const selectedPath = await window.electronAPI.showDirectoryPicker();
@@ -117,7 +110,7 @@ export function useFileOperations({
       setError("Failed to open directory picker");
     }
     return null;
-  }, [isElectron, setError]);
+  }, [setError]);
 
   const loadDirectory = useCallback(async (pathToLoad?: string) => {
     const targetPath = pathToLoad || dirPath;
@@ -127,10 +120,6 @@ export function useFileOperations({
       return;
     }
 
-    if (!isElectron || !window.electronAPI) {
-      setError("Directory loading is only available in the desktop app");
-      return;
-    }
 
     setLoading(true);
     setError(null);
@@ -159,7 +148,6 @@ export function useFileOperations({
     setExpandedDirs,
     setLoading,
     setError,
-    isElectron,
   ]);
 
   const loadTestData = useCallback(() => {
@@ -292,10 +280,6 @@ export function useFileOperations({
   const copyToClipboard = useCallback(async () => {
     if (!selections.size) return;
 
-    if (!isElectron || !window.electronAPI) {
-      setError("File copying is only available in the desktop app");
-      return;
-    }
 
     setLoading(true);
     setError(null);
@@ -311,7 +295,7 @@ export function useFileOperations({
     } finally {
       setLoading(false);
     }
-  }, [dirPath, selections, setLoading, setCopySuccess, setError, isElectron]);
+  }, [dirPath, selections, setLoading, setCopySuccess, setError]);
 
   const handleRemoveRecentPath = useCallback((path: string) => {
     removeRecentPath(path);
@@ -328,7 +312,6 @@ export function useFileOperations({
     loadTestData,
     copyToClipboard,
     showDirectoryPicker,
-    isElectron,
     recentPaths,
     removeRecentPath: handleRemoveRecentPath,
     clearRecentPaths: handleClearRecentPaths,

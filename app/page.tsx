@@ -77,10 +77,6 @@ export default function Home() {
       return;
     }
 
-    if (!isElectron || !window.electronAPI) {
-      setPreviewContent("Preview is only available in the desktop app");
-      return;
-    }
 
     setLoadingPreview(true);
     try {
@@ -579,90 +575,26 @@ export default function Home() {
                 {/* Directory Input Section */}
                 <div className="space-y-6 mb-6">
                   <div className="relative flex flex-col gap-3 rounded-2xl border-2 border-dashed border-blue-300 hover:border-blue-400 p-6 transition-all duration-200">
-                    {isElectron && !dirPath.trim() ? (
-                      /* Electron: Show only Browse button until path is selected */
-                      <div className="text-center">
-                        <Button
-                          onClick={handleBrowseDirectory}
-                          disabled={loading}
-                          variant="outline"
-                          className="font-medium"
-                        >
-                          {loading ? (
-                            <>
-                              <div className="w-4 h-4 mr-2 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
-                              Loading...
-                            </>
-                          ) : (
-                            <>
-                              <FolderOpen size={16} />
-                              Browse for Project Directory...
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                    ) : (
-                      /* Web or Electron with selected path: Show input and buttons */
-                      <>
-                        <input
-                          type="text"
-                          placeholder="/Users/you/Projects"
-                          value={dirPath}
-                          onChange={(e) => {
-                            setDirPath(e.target.value);
-                            setIsManuallyEditing(true);
-                          }}
-                          onPaste={handlePaste}
-                          onKeyDown={handleKeyDown}
-                          className="bg-transparent text-base font-mono placeholder-gray-400 focus:outline-none text-center"
-                        />
-
-                        <div className="flex gap-2">
-                          {isElectron && (
-                            <Button
-                              onClick={handleBrowseDirectory}
-                              disabled={loading}
-                              variant="outline"
-                              className="flex-1 font-medium"
-                            >
-                              {loading ? (
-                                <>
-                                  <div className="w-4 h-4 mr-2 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
-                                  Loading...
-                                </>
-                              ) : (
-                                <>
-                                  <FolderOpen size={16} />
-                                  Browse...
-                                </>
-                              )}
-                            </Button>
-                          )}
-                          <Button
-                            onClick={() => {
-                              setIsManuallyEditing(false); // Reset manual editing flag
-                              loadDirectory();
-                            }}
-                            disabled={loading || !dirPath.trim()}
-                            className={`font-medium ${
-                              isElectron ? "flex-1" : "w-full"
-                            }`}
-                          >
-                            {loading ? (
-                              <>
-                                <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                Loading...
-                              </>
-                            ) : (
-                              <>
-                                <FolderOpen size={16} />
-                                Load Directory
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                      </>
-                    )}
+                    <div className="text-center">
+                      <Button
+                        onClick={handleBrowseDirectory}
+                        disabled={loading}
+                        variant="outline"
+                        className="font-medium"
+                      >
+                        {loading ? (
+                          <>
+                            <div className="w-4 h-4 mr-2 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                            Loading...
+                          </>
+                        ) : (
+                          <>
+                            <FolderOpen size={16} />
+                            Browse for Project Directory...
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </div>
                 </div>
 

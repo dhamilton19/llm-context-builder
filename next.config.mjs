@@ -9,9 +9,17 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  output: 'export',
-  trailingSlash: true,
-  assetPrefix: './',
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      config.target = "electron-renderer";
+      config.externals = {
+        ...config.externals,
+        "fs": "require('fs')",
+        "path": "require('path')",
+      };
+    }
+    return config;
+  },
 }
 
 export default nextConfig
