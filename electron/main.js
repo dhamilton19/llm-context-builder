@@ -171,133 +171,114 @@ ipcMain.handle('show-directory-picker', async () => {
   return null;
 });
 
-// Handle file system operations
-ipcMain.handle('get-directory-contents', async (event, dirPath) => {
-  const fs = require('fs/promises');
+// Sanitize path to prevent directory traversal
+function sanitizePath(basePath, relativePath) {
   const path = require('path');
-  
+  const fullPath = path.join(basePath, relativePath);
+  if (!fullPath.startsWith(basePath)) {
+    throw new Error('Invalid path: directory traversal detected.');
+  }
+  return fullPath;
+}
+
+// Stream directory contents
+ipcMain.on('stream-directory-contents', async (event, dirPath) => {
+  const fs = require('fs');
+  const path = require('path');
+  const { performance } = require('perf_hooks');
+
   try {
-    // Read gitignore patterns first
     const gitignorePatterns = await readGitignorePatterns(dirPath);
+    const queue = [{ fullPath: dirPath, relativePath: '' }];
     
-    const entries = await fs.readdir(dirPath);
-    const result = [];
-    
-    for (const entry of entries) {
-      // Skip hidden files except .gitignore
-      if (entry.startsWith(".") && entry !== '.gitignore') continue;
-      
-      const fullPath = path.join(dirPath, entry);
-      const stats = await fs.stat(fullPath);
-      
-      // Skip .gitignore from results (don't show it in the tree)
-      if (entry === '.gitignore') continue;
-      
-      // Check if entry should be ignored based on gitignore patterns
-      if (shouldIgnoreFile(entry, gitignorePatterns)) continue;
-      
-      if (stats.isDirectory()) {
-        const children = await getDirectoryContentsRecursive(fullPath, entry, gitignorePatterns);
-        result.push({ 
-          name: entry, 
-          path: entry, 
-          type: "directory", 
-          children 
-        });
-      } else {
-        result.push({ 
-          name: entry, 
-          path: entry, 
-          type: "file" 
-        });
+    const startTime = performance.now();
+
+    while (queue.length > 0) {
+      const { fullPath, relativePath } = queue.shift();
+
+      try {
+        const entries = await fs.promises.readdir(fullPath, { withFileTypes: true });
+
+        for (const entry of entries) {
+          // Skip hidden files except .gitignore
+          if (entry.name.startsWith('.') && entry.name !== '.gitignore') continue;
+          if (entry.name === '.gitignore') continue;
+
+          const entryRelativePath = path.join(relativePath, entry.name).replace(/\\/g, '/');
+
+          // Check if entry should be ignored
+          if (shouldIgnoreFile(entryRelativePath, gitignorePatterns)) continue;
+
+          const entryFullPath = path.join(fullPath, entry.name);
+          const payload = {
+            name: entry.name,
+            path: entryRelativePath,
+            type: entry.isDirectory() ? 'directory' : 'file',
+            parent: relativePath || null,
+          };
+
+          event.sender.send('directory-entry', payload);
+
+          if (entry.isDirectory()) {
+            queue.push({ fullPath: entryFullPath, relativePath: entryRelativePath });
+          }
+        }
+      } catch (err) {
+        event.sender.send('directory-stream-error', `Error reading ${fullPath}: ${err.message}`);
       }
     }
     
-    return result;
+    const endTime = performance.now();
+    console.log(`Directory scan took ${endTime - startTime} ms`);
+
+    event.sender.send('directory-stream-end');
+
   } catch (error) {
-    throw new Error(`Unable to read directory: ${error.message}`);
+    event.sender.send('directory-stream-error', `Failed to start stream: ${error.message}`);
+    event.sender.send('directory-stream-end');
   }
 });
 
-async function getDirectoryContentsRecursive(fullPath, relativePath, gitignorePatterns) {
-  const fs = require('fs/promises');
-  const path = require('path');
-  
-  try {
-    const entries = await fs.readdir(fullPath);
-    const result = [];
-    
-    for (const entry of entries) {
-      // Skip hidden files except .gitignore
-      if (entry.startsWith(".") && entry !== '.gitignore') continue;
-      
-      const entryFullPath = path.join(fullPath, entry);
-      const entryRelativePath = path.join(relativePath, entry).replace(/\\/g, '/');
-      const stats = await fs.stat(entryFullPath);
-      
-      // Skip .gitignore from results
-      if (entry === '.gitignore') continue;
-      
-      // Check if entry should be ignored based on gitignore patterns
-      if (shouldIgnoreFile(entryRelativePath, gitignorePatterns)) continue;
-      
-      if (stats.isDirectory()) {
-        const children = await getDirectoryContentsRecursive(entryFullPath, entryRelativePath, gitignorePatterns);
-        result.push({ 
-          name: entry, 
-          path: entryRelativePath, 
-          type: "directory", 
-          children 
-        });
-      } else {
-        result.push({ 
-          name: entry, 
-          path: entryRelativePath, 
-          type: "file" 
-        });
-      }
-    }
-    
-    return result;
-  } catch (error) {
-    return [];
-  }
-}
-
-// Handle file reading
+// Handle file reading with parallel queue
 ipcMain.handle('read-files', async (event, dirPath, selections) => {
   const fs = require('fs/promises');
   const path = require('path');
+  const pLimit = (await import('p-limit')).default;
   
-  // Generate file map (we need to implement this in Node.js context)
+  // Concurrency limit
+  const limit = pLimit(8);
+
   const fileMap = generateFileMapNode(dirPath, selections);
-  
   let xml = "<files>\n";
-  
-  // Add file map section
+
   if (fileMap) {
     xml += "  <file_map>\n";
     xml += fileMap.split('\n').map(line => `${line}`).join('\n');
     xml += "\n  </file_map>\n\n";
   }
-  
-  for (const relativePath of selections) {
-    try {
-      const fullPath = path.join(dirPath, relativePath);
-      const stats = await fs.stat(fullPath);
-      
-      if (stats.isFile()) {
-        const content = await fs.readFile(fullPath, "utf-8");
-        xml += `  <file path="${relativePath}">\n${content}\n  </file>\n`;
-      } else {
-        xml += `  <directory path="${relativePath}" />\n`;
+
+  const readPromises = selections.map(relativePath =>
+    limit(async () => {
+      try {
+        const fullPath = sanitizePath(dirPath, relativePath);
+        const stats = await fs.stat(fullPath);
+
+        if (stats.isFile()) {
+          const content = await fs.readFile(fullPath, "utf-8");
+          return `  <file path="${relativePath}">\n${content}\n  </file>\n`;
+        } else {
+          return `  <directory path="${relativePath}" />\n`;
+        }
+      } catch (error) {
+        return `  <file path="${relativePath}" error="Unable to read: ${error.message}" />\n`;
       }
-    } catch (error) {
-      xml += `  <file path="${relativePath}" error="Unable to read" />\n`;
-    }
-  }
-  
+    })
+  );
+
+  const results = await Promise.all(readPromises);
+  xml += results.join('');
   xml += "</files>";
+
   return xml;
 });
 
