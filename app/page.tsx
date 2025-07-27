@@ -17,6 +17,7 @@ import {
   shouldExcludeFileByGitignore,
   parseGitignorePatterns,
 } from "@/lib/exclude-patterns";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 interface FileNodeType {
   name: string;
@@ -549,6 +550,9 @@ export default function Home() {
               <h1 className="text-xl font-semibold tracking-tight text-gray-800">
                 LLM Context Builder
               </h1>
+            </div>
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
             </div>
           </div>
         </div>
