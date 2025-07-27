@@ -14,7 +14,7 @@ import { RecentPaths } from "@/components/recent-paths";
 import { FilterPopup } from "@/components/filter-popup";
 import { shouldIncludeFile } from "@/lib/file-types";
 import {
-  shouldExcludeFileByGitignore,
+  shouldExclude,
   parseGitignorePatterns,
 } from "@/lib/exclude-patterns";
 
@@ -393,7 +393,7 @@ export default function Home() {
 
       for (const node of nodes) {
         // Skip files/directories that match gitignore patterns
-        if (shouldExcludeFileByGitignore(node.path, gitignorePatterns)) {
+        if (shouldExclude(node.path, gitignorePatterns)) {
           continue;
         }
 
@@ -414,7 +414,7 @@ export default function Home() {
               nameMatches && !query && fileTypeFilter.size === 0
                 ? node.children.filter(
                     (child) =>
-                      !shouldExcludeFileByGitignore(
+                      !shouldExclude(
                         child.path,
                         gitignorePatterns
                       )
@@ -445,7 +445,7 @@ export default function Home() {
       const files: string[] = [];
       for (const node of nodes) {
         // Skip files that match gitignore patterns
-        if (shouldExcludeFileByGitignore(node.path, gitignorePatterns)) {
+        if (shouldExclude(node.path, gitignorePatterns)) {
           continue;
         }
 

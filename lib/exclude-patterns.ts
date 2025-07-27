@@ -1,64 +1,52 @@
 
-// Check if a file path matches any of the given patterns
-export function matchesPatterns(filePath: string, patterns: string[]): boolean {
-  const normalizedPath = filePath.replace(/\\/g, '/');
-  
-  for (const pattern of patterns) {
-    if (matchesGlob(normalizedPath, pattern)) {
-      return true;
-    }
+import ignore from 'ignore';
+
+// Cache for compiled ignore patterns
+const ignoreCache = new Map<string, any>();
+
+/**
+ * A helper function that returns an ignore instance for the given patterns.
+ * Caches the instance based on the patterns.
+ *
+ * @param patterns The gitignore patterns.
+ * @returns An ignore instance.
+ */
+function getIgnorer(patterns: string[]) {
+  const cacheKey = patterns.join('\n');
+  if (ignoreCache.has(cacheKey)) {
+    return ignoreCache.get(cacheKey);
   }
-  
-  return false;
+
+  const ignorer = ignore().add(patterns);
+  ignoreCache.set(cacheKey, ignorer);
+  return ignorer;
 }
 
-// Simple glob pattern matching
-function matchesGlob(filePath: string, pattern: string): boolean {
-  // Normalize paths
-  const normalizedPath = filePath.replace(/\\/g, '/');
-  const normalizedPattern = pattern.replace(/\\/g, '/');
-  
-  // Convert glob pattern to regex
-  const regexPattern = normalizedPattern
-    .replace(/\./g, '\\.') // Escape dots first
-    .replace(/\*\*/g, '.*') // ** matches any number of directories
-    .replace(/\*/g, '[^/]*') // * matches anything except /
-    .replace(/\?/g, '.'); // ? matches single character
-  
-  const regex = new RegExp(`^${regexPattern}$`);
-  return regex.test(normalizedPath);
+/**
+ * Checks if a file path should be excluded based on the given gitignore patterns.
+ *
+ * @param filePath The path of the file to check.
+ * @param patterns An array of gitignore patterns.
+ * @returns `true` if the file should be excluded, `false` otherwise.
+ */
+export function shouldExclude(filePath: string, patterns: string[]): boolean {
+  if (patterns.length === 0) {
+    return false;
+  }
+
+  const ignorer = getIgnorer(patterns);
+  return ignorer.ignores(filePath);
 }
 
-
-// Check if a file should be excluded based on raw gitignore patterns
-export function shouldExcludeFileByGitignore(filePath: string, gitignorePatterns: string[]): boolean {
-  return matchesPatterns(filePath, gitignorePatterns);
-}
-
-// Parse gitignore content and return raw patterns
+/**
+ * Parses gitignore content and returns an array of patterns.
+ *
+ * @param gitignoreContent The content of the .gitignore file.
+ * @returns An array of gitignore patterns.
+ */
 export function parseGitignorePatterns(gitignoreContent: string): string[] {
   return gitignoreContent
     .split('\n')
     .map(line => line.trim())
-    .filter(line => line && !line.startsWith('#') && !line.startsWith('!'))
-    .map(line => {
-      // Convert gitignore patterns to work with our matching
-      if (line.startsWith('/')) {
-        // Root-relative pattern - remove leading slash
-        const pattern = line.substring(1);
-        // If it's a directory (ends with /) or looks like a directory name, match it and all contents
-        if (pattern.endsWith('/') || (!pattern.includes('.') && !pattern.includes('*'))) {
-          return `${pattern}/**`;
-        }
-        return pattern;
-      }
-      if (!line.includes('/')) {
-        // Match anywhere in path - if it looks like a directory, include all contents
-        if (!line.includes('.') && !line.includes('*')) {
-          return `**/${line}/**`;
-        }
-        return `**/${line}`;
-      }
-      return line;
-    });
+    .filter(line => line && !line.startsWith('#'));
 }
