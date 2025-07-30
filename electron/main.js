@@ -13,13 +13,32 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js')
     },
     icon: path.join(__dirname, '../public/logo.png'),
+    title: 'LLM Context Builder',
     titleBarStyle: 'default',
+    titleBarOverlay: process.platform !== 'darwin' ? {
+      color: '#3b82f6',
+      symbolColor: '#ffffff',
+      height: 40
+    } : false,
     show: false
   });
 
   const startUrl = isDev 
     ? 'http://localhost:3000'
     : `file://${path.join(__dirname, '../out/index.html')}`;
+  
+  // In development, wait for Next.js to be ready
+  if (isDev) {
+    // Add error handling for development server connection
+    mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+      if (validatedURL === 'http://localhost:3000/') {
+        console.log('Waiting for Next.js development server...');
+        setTimeout(() => {
+          mainWindow.reload();
+        }, 1000);
+      }
+    });
+  }
   
   mainWindow.loadURL(startUrl);
 
@@ -420,27 +439,8 @@ function parseGitignorePatterns(gitignoreContent) {
   return gitignoreContent
     .split('\n')
     .map(line => line.trim())
-    .filter(line => line && !line.startsWith('#') && !line.startsWith('!'))
-    .map(line => {
-      // Convert gitignore patterns to work with our matching
-      if (line.startsWith('/')) {
-        // Root-relative pattern - remove leading slash
-        const pattern = line.substring(1);
-        // If it's a directory (ends with /) or looks like a directory name, match it and all contents
-        if (pattern.endsWith('/') || (!pattern.includes('.') && !pattern.includes('*'))) {
-          return `${pattern}/**`;
-        }
-        return pattern;
-      }
-      if (!line.includes('/')) {
-        // Match anywhere in path - if it looks like a directory, include all contents
-        if (!line.includes('.') && !line.includes('*')) {
-          return `**/${line}/**`;
-        }
-        return `**/${line}`;
-      }
-      return line;
-    });
+    .filter(line => line && !line.startsWith('#')) // Keep negation patterns (!)
+    .filter(line => line !== '');
 }
 
 function shouldIgnoreFile(filePath, gitignorePatterns) {

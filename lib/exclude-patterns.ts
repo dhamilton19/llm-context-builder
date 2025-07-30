@@ -1,64 +1,103 @@
+import ignore from 'glob-gitignore';
 
-// Check if a file path matches any of the given patterns
-export function matchesPatterns(filePath: string, patterns: string[]): boolean {
-  const normalizedPath = filePath.replace(/\\/g, '/');
+interface CacheEntry {
+  instance: ReturnType<typeof ignore>;
+  patterns: string[];
+  timestamp: number;
+}
+
+// Cache compiled gitignore instances with 5-minute TTL
+const gitignoreCache = new Map<string, CacheEntry>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+// Default patterns for common exclusions
+const DEFAULT_PATTERNS = [
+  'node_modules/**',
+  'dist/**',
+  'build/**',
+  '.next/**',
+  'coverage/**',
+  '.git/**',
+  '*.log',
+  '.DS_Store',
+  'Thumbs.db'
+];
+
+
+/**
+ * Get a compiled gitignore instance with caching
+ */
+function getGitignoreInstance(patterns: string[]): ReturnType<typeof ignore> {
+  // Create cache key from patterns
+  const cacheKey = patterns.sort().join('|');
+  const now = Date.now();
   
-  for (const pattern of patterns) {
-    if (matchesGlob(normalizedPath, pattern)) {
-      return true;
+  // Check if we have a valid cached entry
+  const cached = gitignoreCache.get(cacheKey);
+  if (cached && (now - cached.timestamp) < CACHE_TTL) {
+    return cached.instance;
+  }
+  
+  // Create new instance
+  const instance = ignore().add(patterns);
+  
+  // Cache it
+  gitignoreCache.set(cacheKey, {
+    instance,
+    patterns: [...patterns],
+    timestamp: now
+  });
+  
+  // Clean up old cache entries (simple cleanup on new entries)
+  if (gitignoreCache.size > 10) {
+    for (const [key, entry] of gitignoreCache.entries()) {
+      if ((now - entry.timestamp) > CACHE_TTL) {
+        gitignoreCache.delete(key);
+      }
     }
   }
   
-  return false;
+  return instance;
 }
 
-// Simple glob pattern matching
-function matchesGlob(filePath: string, pattern: string): boolean {
-  // Normalize paths
-  const normalizedPath = filePath.replace(/\\/g, '/');
-  const normalizedPattern = pattern.replace(/\\/g, '/');
+/**
+ * Single helper function to check if a file should be excluded
+ * @param filePath - The file path to check (relative or absolute)
+ * @param customPatterns - Optional custom patterns to use instead of defaults
+ * @returns true if the file should be excluded
+ */
+export function shouldExclude(filePath: string, customPatterns?: string[]): boolean {
+  // Normalize the path - remove leading slash and convert backslashes
+  const normalizedPath = filePath.replace(/^\/+/, '').replace(/\\/g, '/');
   
-  // Convert glob pattern to regex
-  const regexPattern = normalizedPattern
-    .replace(/\./g, '\\.') // Escape dots first
-    .replace(/\*\*/g, '.*') // ** matches any number of directories
-    .replace(/\*/g, '[^/]*') // * matches anything except /
-    .replace(/\?/g, '.'); // ? matches single character
+  // Use custom patterns or defaults
+  const patterns = customPatterns || DEFAULT_PATTERNS;
   
-  const regex = new RegExp(`^${regexPattern}$`);
-  return regex.test(normalizedPath);
+  // Get cached gitignore instance
+  const gitignoreInstance = getGitignoreInstance(patterns);
+  
+  // Check if the file is ignored
+  return gitignoreInstance.ignores(normalizedPath);
 }
 
-
-// Check if a file should be excluded based on raw gitignore patterns
-export function shouldExcludeFileByGitignore(filePath: string, gitignorePatterns: string[]): boolean {
-  return matchesPatterns(filePath, gitignorePatterns);
-}
-
-// Parse gitignore content and return raw patterns
+/**
+ * Parse gitignore content into patterns array
+ * @param gitignoreContent - Raw .gitignore file content
+ * @returns Array of gitignore patterns
+ */
 export function parseGitignorePatterns(gitignoreContent: string): string[] {
   return gitignoreContent
     .split('\n')
     .map(line => line.trim())
-    .filter(line => line && !line.startsWith('#') && !line.startsWith('!'))
-    .map(line => {
-      // Convert gitignore patterns to work with our matching
-      if (line.startsWith('/')) {
-        // Root-relative pattern - remove leading slash
-        const pattern = line.substring(1);
-        // If it's a directory (ends with /) or looks like a directory name, match it and all contents
-        if (pattern.endsWith('/') || (!pattern.includes('.') && !pattern.includes('*'))) {
-          return `${pattern}/**`;
-        }
-        return pattern;
-      }
-      if (!line.includes('/')) {
-        // Match anywhere in path - if it looks like a directory, include all contents
-        if (!line.includes('.') && !line.includes('*')) {
-          return `**/${line}/**`;
-        }
-        return `**/${line}`;
-      }
-      return line;
-    });
+    .filter(line => line && !line.startsWith('#')) // Keep negation patterns (!)
+    .filter(line => line !== '');
 }
+
+
+/**
+ * Clear the gitignore cache (useful for testing or memory management)
+ */
+export function clearCache(): void {
+  gitignoreCache.clear();
+}
+

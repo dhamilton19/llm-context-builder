@@ -173,14 +173,24 @@ npm run electron
 ### Production Builds
 
 ```bash
-npm run build-electron    # Current platform
-npm run dist              # All platforms (requires setup)
+# Build for current platform
+npm run build-electron
+
+# Build for specific platforms
+npm run build:mac       # macOS Apple Silicon (.dmg)
+npm run build:windows   # Windows x64 (portable .exe)
+npm run build:linux     # Linux x64 (.deb)
+
+# Or use dist aliases
+npm run dist:mac
+npm run dist:windows
+npm run dist:linux
 ```
 
-Tested on:
-
-- ✅ macOS (primary)
-- ⚠️ Windows/Linux (config present, untested)
+**Platform Support:**
+- ✅ **macOS**: Apple Silicon (arm64) - DMG installer
+- ✅ **Windows**: x64 - Portable executable 
+- ✅ **Linux**: x64 - Debian package (.deb)
 
 > Code signing & auto-update are not included.
 

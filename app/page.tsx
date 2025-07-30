@@ -12,11 +12,9 @@ import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { useFileOperations } from "@/hooks/use-file-operations";
 import { RecentPaths } from "@/components/recent-paths";
 import { FilterPopup } from "@/components/filter-popup";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { shouldIncludeFile } from "@/lib/file-types";
-import {
-  shouldExcludeFileByGitignore,
-  parseGitignorePatterns,
-} from "@/lib/exclude-patterns";
+import { shouldExclude } from "@/lib/exclude-patterns";
 
 interface FileNodeType {
   name: string;
@@ -42,10 +40,11 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [previewContent, setPreviewContent] = useState<string>("");
   const [loadingPreview, setLoadingPreview] = useState(false);
-  const clearingDirectory = useRef(false);
   const [isManuallyEditing, setIsManuallyEditing] = useState(false);
   const [selectedFileTypes, setSelectedFileTypes] = useState(new Set<string>());
-  const [gitignorePatterns, setGitignorePatterns] = useState<string[]>([]);
+  
+  // Check if running in Electron
+  const isElectron = typeof window !== 'undefined' && window.electronAPI;
 
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -54,7 +53,6 @@ export default function Home() {
     loadTestData,
     copyToClipboard,
     showDirectoryPicker,
-    isElectron,
     recentPaths,
     removeRecentPath,
     clearRecentPaths,
@@ -77,8 +75,7 @@ export default function Home() {
       return;
     }
 
-    if (!isElectron || !window.electronAPI) {
-      setPreviewContent("Preview is only available in the desktop app");
+    if (!window.electronAPI) {
       return;
     }
 
@@ -94,7 +91,7 @@ export default function Home() {
     } finally {
       setLoadingPreview(false);
     }
-  }, [dirPath, selections, isElectron]);
+  }, [dirPath, selections]);
 
   // Load preview when selections change
   useEffect(() => {
@@ -106,44 +103,13 @@ export default function Home() {
     onSearch: () => searchInputRef.current?.focus(),
   });
 
-  const handlePaste = useCallback(
-    (e: React.ClipboardEvent<HTMLInputElement>) => {
-      // Get the pasted text from the clipboard
-      const pastedText = e.clipboardData.getData("text");
-
-      let cleanPath = pastedText
-        .replace(/^["']|["']$/g, "") // Remove surrounding quotes
-        .replace(/\\/g, "/") // Convert backslashes to forward slashes
-        .trim();
-
-      // Handle file:// URLs
-      if (cleanPath.startsWith("file://")) {
-        cleanPath = decodeURIComponent(cleanPath.substring(7)); // Remove 'file://' and decode URI
-      }
-
-      if (cleanPath !== pastedText) {
-        e.preventDefault(); // Prevent the default paste
-        setDirPath(cleanPath);
-      }
-    },
-    []
-  );
-
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === "Enter" && dirPath.trim() && !loading) {
-        setIsManuallyEditing(false); // Reset manual editing flag
-        loadDirectory();
-      }
-    },
-    [dirPath, loading, loadDirectory]
-  );
 
   const handleBrowseDirectory = useCallback(async () => {
     const selectedPath = await showDirectoryPicker();
     if (selectedPath) {
       setDirPath(selectedPath);
-      setIsManuallyEditing(false); // Reset manual editing flag
+      setIsManuallyEditing(false);
+      // Immediately start loading - no intermediate input state
       await loadDirectory(selectedPath);
     }
   }, [showDirectoryPicker, setDirPath, loadDirectory]);
@@ -156,6 +122,14 @@ export default function Home() {
     },
     [setDirPath, loadDirectory]
   );
+
+  const handleDirectoryDrop = useCallback(async (path: string) => {
+    if (path) {
+      setDirPath(path);
+      setIsManuallyEditing(false);
+      await loadDirectory(path);
+    }
+  }, [setDirPath, loadDirectory]);
 
   const renderPreviewContent = useCallback((content: string) => {
     if (!content) {
@@ -221,9 +195,7 @@ export default function Home() {
 
   const toggleSelect = useCallback(
     (path: string) => {
-      console.log("toggleSelect called with path:", path);
       setSelections((prev) => {
-        console.log("Previous selections:", Array.from(prev));
         const next = new Set(prev);
 
         if (!tree) return next;
@@ -321,7 +293,6 @@ export default function Home() {
           }
         }
 
-        console.log("New selections after toggle:", Array.from(next));
         return next;
       });
     },
@@ -392,8 +363,8 @@ export default function Home() {
       const pathsToExpand: string[] = [];
 
       for (const node of nodes) {
-        // Skip files/directories that match gitignore patterns
-        if (shouldExcludeFileByGitignore(node.path, gitignorePatterns)) {
+        // Skip files/directories that should be excluded
+        if (shouldExclude(node.path)) {
           continue;
         }
 
@@ -413,11 +384,7 @@ export default function Home() {
             const childrenToShow =
               nameMatches && !query && fileTypeFilter.size === 0
                 ? node.children.filter(
-                    (child) =>
-                      !shouldExcludeFileByGitignore(
-                        child.path,
-                        gitignorePatterns
-                      )
+                    (child) => !shouldExclude(child.path)
                   )
                 : result.filtered;
             filtered.push({ ...node, children: childrenToShow });
@@ -434,7 +401,7 @@ export default function Home() {
 
       return { filtered, pathsToExpand };
     },
-    [gitignorePatterns]
+    []
   );
 
   // Get all available files for file type analysis (excluding gitignored files)
@@ -444,8 +411,8 @@ export default function Home() {
     const collectFiles = (nodes: FileNodeType[]): string[] => {
       const files: string[] = [];
       for (const node of nodes) {
-        // Skip files that match gitignore patterns
-        if (shouldExcludeFileByGitignore(node.path, gitignorePatterns)) {
+        // Skip files that should be excluded
+        if (shouldExclude(node.path)) {
           continue;
         }
 
@@ -459,7 +426,7 @@ export default function Home() {
     };
 
     return collectFiles(tree.children);
-  }, [tree, gitignorePatterns]);
+  }, [tree]);
 
   // Memoize the filtered result to prevent infinite re-renders
   const filteredResult = useMemo(() => {
@@ -511,20 +478,6 @@ export default function Home() {
     }
   }, [searchQuery, filteredResult.pathsToExpand]);
 
-  // Set default gitignore patterns (Electron will handle actual gitignore reading)
-  useEffect(() => {
-    if (!tree) return;
-
-    // Use common default patterns since Electron handles actual gitignore parsing
-    setGitignorePatterns([
-      "node_modules/**",
-      "dist/**",
-      "build/**",
-      ".next/**",
-      "coverage/**",
-      ".git/**",
-    ]);
-  }, [tree]);
 
   // Clear error after 5 seconds
   useEffect(() => {
@@ -535,134 +488,171 @@ export default function Home() {
   }, [error]);
 
   return (
-    <div className="h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex flex-col overflow-hidden">
-      {/* Top Navigation Bar */}
-      <div className="bg-gradient-to-r from-blue-500 to-blue-600 border-b border-blue-600/30 shadow-lg flex-shrink-0">
-        <div className="px-4 sm:px-6">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-4">
-              <img
-                src="/logo.png"
-                alt="LLM Context Builder"
-                className="w-8 h-8 rounded-lg"
-              />
-              <h1 className="text-xl font-semibold tracking-tight text-gray-800">
-                LLM Context Builder
-              </h1>
-            </div>
-          </div>
-        </div>
+    <div className="h-screen bg-background flex flex-col overflow-hidden">
+      {/* Minimal top bar for theme toggle */}
+      <div className="h-8 bg-card border-b border-border flex items-center justify-end px-3 flex-shrink-0">
+        <ThemeToggle />
       </div>
 
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Error Banner */}
         {error && (
-          <div className="mx-4 sm:mx-6 mb-4 mt-4 rounded-xl bg-red-50 border border-red-200 p-4 flex-shrink-0">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-2 h-2 bg-red-400 rounded-full"></div>
+          <div className="mx-4 mb-4 mt-4 bg-destructive/10 border border-destructive/20 p-4 flex-shrink-0">
+            <div className="flex items-start">
+              <div className="flex-shrink-0 mt-1">
+                <div className="w-2 h-2 bg-destructive rounded-full"></div>
               </div>
-              <div className="ml-3">
-                <p className="text-sm font-medium text-red-800">{error}</p>
+              <div className="ml-3 flex-1">
+                <p className="text-sm font-medium text-destructive mb-1">
+                  Directory Loading Failed
+                </p>
+                <p className="text-sm text-destructive/80">{error}</p>
+                {dirPath && (
+                  <p className="text-xs text-muted-foreground mt-2 font-mono">
+                    Path: {dirPath}
+                  </p>
+                )}
               </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setError(null)}
+                className="ml-2 h-auto p-1 text-destructive/60 hover:text-destructive"
+              >
+                ×
+              </Button>
             </div>
           </div>
         )}
 
         {/* Main Content */}
         <div className="grid grid-cols-5 flex-1 min-h-0">
-          {!filteredTree ? (
+          {loading && dirPath ? (
+            /* Loading State - Show skeleton while loading */
+            <>
+              {/* Left Panel - Loading Skeleton */}
+              <Card className="col-span-2 p-6 bg-muted/50 border-0 rounded-none border-r border-border flex flex-col fade-in">
+                <div className="mb-4">
+                  <div className="h-4 bg-muted rounded animate-pulse mb-2"></div>
+                  <div className="h-10 bg-muted rounded animate-pulse"></div>
+                </div>
+                <div className="flex-1 space-y-2">
+                  <div className="flex items-center space-x-3 p-2">
+                    <div className="w-4 h-4 bg-muted rounded animate-pulse"></div>
+                    <div className="h-4 bg-muted rounded flex-1 animate-pulse"></div>
+                  </div>
+                  <div className="flex items-center space-x-3 p-2 ml-4">
+                    <div className="w-4 h-4 bg-muted rounded animate-pulse"></div>
+                    <div className="h-4 bg-muted rounded flex-1 animate-pulse"></div>
+                  </div>
+                  <div className="flex items-center space-x-3 p-2 ml-4">
+                    <div className="w-4 h-4 bg-muted rounded animate-pulse"></div>
+                    <div className="h-4 bg-muted rounded flex-1 animate-pulse"></div>
+                  </div>
+                  <div className="flex items-center space-x-3 p-2">
+                    <div className="w-4 h-4 bg-muted rounded animate-pulse"></div>
+                    <div className="h-4 bg-muted rounded flex-1 animate-pulse"></div>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Right Panel - Loading Message */}
+              <Card className="col-span-3 p-6 bg-background border-0 rounded-none flex flex-col fade-in">
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center">
+                    <div className="w-12 h-12 mx-auto mb-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                    <h3 className="text-lg font-semibold text-foreground mb-2">
+                      Loading Directory
+                    </h3>
+                    <p className="text-muted-foreground">
+                      Reading files and folders from<br />
+                      <span className="font-mono text-sm">{dirPath}</span>
+                    </p>
+                  </div>
+                </div>
+              </Card>
+            </>
+          ) : !filteredTree ? (
             /* No Directory Loaded - Show Directory Input and Recent Paths on Left */
             <>
               {/* Left Panel - Directory Input and Recent Paths */}
-              <Card className="col-span-2 p-6 bg-white/95 backdrop-blur-xl border-0 shadow-lg rounded-none border-r border-blue-200/60 flex flex-col space-y-8">
+              <Card className="col-span-2 p-6 bg-card border-0 rounded-none border-r border-border flex flex-col space-y-8 fade-in">
                 {/* Directory Input Section */}
                 <div className="space-y-6 mb-6">
-                  <div className="relative flex flex-col gap-3 rounded-2xl border-2 border-dashed border-blue-300 hover:border-blue-400 p-6 transition-all duration-200">
-                    {isElectron && !dirPath.trim() ? (
-                      /* Electron: Show only Browse button until path is selected */
-                      <div className="text-center">
-                        <Button
-                          onClick={handleBrowseDirectory}
-                          disabled={loading}
-                          variant="outline"
-                          className="font-medium"
-                        >
-                          {loading ? (
-                            <>
-                              <div className="w-4 h-4 mr-2 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
-                              Loading...
-                            </>
-                          ) : (
-                            <>
-                              <FolderOpen size={16} />
-                              Browse for Project Directory...
-                            </>
-                          )}
-                        </Button>
+                  <div 
+                    className="relative flex flex-col gap-3 border-2 border-dashed border-border hover:border-primary/50 p-8 transition-colors drop-zone"
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      e.currentTarget.classList.add('border-primary', 'bg-primary/5');
+                    }}
+                    onDragEnter={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    onDragLeave={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      // Only remove highlight if we're leaving the drop zone entirely
+                      if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                        e.currentTarget.classList.remove('border-primary', 'bg-primary/5');
+                      }
+                    }}
+                    onDrop={async (e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      e.currentTarget.classList.remove('border-primary', 'bg-primary/5');
+                      
+                      if (isElectron) {
+                        // In Electron, we can get the file path directly
+                        const files = Array.from(e.dataTransfer.files);
+                        if (files.length > 0) {
+                          const file = files[0];
+                          const filePath = (file as any).path;
+                          if (filePath) {
+                            // If it's a file, get its directory
+                            const fs = require('fs');
+                            const path = require('path');
+                            try {
+                              const stats = fs.statSync(filePath);
+                              const dirPath = stats.isDirectory() ? filePath : path.dirname(filePath);
+                              await handleDirectoryDrop(dirPath);
+                            } catch (err) {
+                              setError("Could not access the dropped item");
+                            }
+                          }
+                        }
+                      }
+                    }}
+                  >
+                    <div className="text-center">
+                      <div className="w-16 h-16 mx-auto mb-4 bg-muted rounded-full flex items-center justify-center">
+                        <FolderOpen size={24} className="text-muted-foreground" />
                       </div>
-                    ) : (
-                      /* Web or Electron with selected path: Show input and buttons */
-                      <>
-                        <input
-                          type="text"
-                          placeholder="/Users/you/Projects"
-                          value={dirPath}
-                          onChange={(e) => {
-                            setDirPath(e.target.value);
-                            setIsManuallyEditing(true);
-                          }}
-                          onPaste={handlePaste}
-                          onKeyDown={handleKeyDown}
-                          className="bg-transparent text-base font-mono placeholder-gray-400 focus:outline-none text-center"
-                        />
-
-                        <div className="flex gap-2">
-                          {isElectron && (
-                            <Button
-                              onClick={handleBrowseDirectory}
-                              disabled={loading}
-                              variant="outline"
-                              className="flex-1 font-medium"
-                            >
-                              {loading ? (
-                                <>
-                                  <div className="w-4 h-4 mr-2 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
-                                  Loading...
-                                </>
-                              ) : (
-                                <>
-                                  <FolderOpen size={16} />
-                                  Browse...
-                                </>
-                              )}
-                            </Button>
-                          )}
-                          <Button
-                            onClick={() => {
-                              setIsManuallyEditing(false); // Reset manual editing flag
-                              loadDirectory();
-                            }}
-                            disabled={loading || !dirPath.trim()}
-                            className={`font-medium ${
-                              isElectron ? "flex-1" : "w-full"
-                            }`}
-                          >
-                            {loading ? (
-                              <>
-                                <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                Loading...
-                              </>
-                            ) : (
-                              <>
-                                <FolderOpen size={16} />
-                                Load Directory
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                      </>
-                    )}
+                      <h3 className="font-semibold text-foreground mb-2">
+                        Select Project Directory
+                      </h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Drag and drop a folder here, or click browse
+                      </p>
+                      <Button
+                        onClick={handleBrowseDirectory}
+                        disabled={loading}
+                        className="font-medium"
+                      >
+                        {loading ? (
+                          <>
+                            <div className="w-4 h-4 mr-2 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin"></div>
+                            Opening...
+                          </>
+                        ) : (
+                          <>
+                            <FolderOpen size={16} />
+                            Browse Directory
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </div>
                 </div>
 
@@ -695,13 +685,13 @@ export default function Home() {
               </Card>
 
               {/* Right Panel - Welcome Message */}
-              <Card className="col-span-3 p-6 bg-white border-0 shadow-lg rounded-none">
+              <Card className="col-span-3 p-6 bg-card border-0 rounded-none fade-in">
                 <div className="flex items-center justify-center h-full">
                   <div className="text-center">
-                    <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
-                      <Search size={24} className="text-gray-400" />
+                    <div className="w-16 h-16 mx-auto mb-4 bg-muted flex items-center justify-center">
+                      <Search size={24} className="text-muted-foreground" />
                     </div>
-                    <p className="text-gray-600">
+                    <p className="text-muted-foreground">
                       Select or enter a project directory to begin browsing and
                       preparing your code context for AI conversations
                     </p>
@@ -714,7 +704,7 @@ export default function Home() {
             <>
               {/* File Browser */}
               <div className="col-span-2 flex flex-col min-h-0">
-                <Card className="flex-1 p-6 bg-white/95 backdrop-blur-xl border-0 shadow-lg rounded-none border-r border-blue-200/60 flex flex-col min-h-0">
+                <Card className="flex-1 p-6 bg-muted/50 border-0 rounded-none border-r border-border flex flex-col min-h-0">
                   {/* Search */}
                   <div className="relative mb-2">
                     <Search
@@ -727,7 +717,7 @@ export default function Home() {
                       placeholder="Filter files..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full pl-10 pr-10 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full pl-10 pr-10 py-2 text-sm bg-input border border-border focus:outline-none focus:ring-1 focus:ring-ring"
                     />
                     {searchQuery && (
                       <button
@@ -791,7 +781,7 @@ export default function Home() {
                   </div>
 
                   {/* File Tree */}
-                  <div className="flex-1 overflow-auto rounded-lg border border-blue-200/50 bg-white/60 backdrop-blur-sm min-h-0">
+                  <div className="flex-1 overflow-auto border border-border bg-card min-h-0">
                     <FileTree
                       nodes={filteredTree.children}
                       toggleSelect={toggleSelect}
@@ -801,7 +791,6 @@ export default function Home() {
                       searchQuery={searchQuery}
                       rootPath={dirPath}
                       onClearDirectory={() => {
-                        clearingDirectory.current = true;
                         setDirPath("");
                         setTree(null);
                         setSelections(new Set());
@@ -818,9 +807,9 @@ export default function Home() {
 
               {/* Preview Panel - Always Visible */}
               <div className="col-span-3 flex flex-col min-h-0">
-                <Card className="flex-1 p-6 bg-white border-0 shadow-lg rounded-none flex flex-col min-h-0">
+                <Card className="flex-1 p-6 bg-background border-0 rounded-none flex flex-col min-h-0">
                   <div className="flex items-center justify-between mb-2 h-12">
-                    <h3 className="text-lg font-semibold text-gray-900">
+                    <h3 className="text-lg font-semibold text-foreground">
                       Context Preview
                     </h3>
                     {previewContent && (
@@ -831,33 +820,33 @@ export default function Home() {
                           setSelections(new Set());
                           setPreviewContent("");
                         }}
-                        className="text-gray-600 hover:text-gray-800"
+                        className="text-muted-foreground hover:text-foreground"
                       >
                         Clear
                       </Button>
                     )}
                   </div>
 
-                  <div className="flex-1 overflow-auto rounded-lg border border-blue-200/60 bg-blue-50/80 backdrop-blur-sm">
+                  <div className="flex-1 overflow-auto border border-border bg-card">
                     {loadingPreview ? (
                       <div className="flex items-center justify-center py-12">
                         <div className="text-center">
-                          <div className="w-8 h-8 mx-auto mb-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                          <p className="text-sm text-gray-600">
+                          <div className="w-8 h-8 mx-auto mb-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                          <p className="text-sm text-muted-foreground">
                             Loading preview...
                           </p>
                         </div>
                       </div>
                     ) : selections.size === 0 ? (
-                      <div className="flex items-center justify-center h-full text-gray-500">
+                      <div className="flex items-center justify-center h-full text-muted-foreground">
                         <div className="text-center">
-                          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
-                            <Eye size={24} className="text-gray-400" />
+                          <div className="w-16 h-16 mx-auto mb-4 bg-muted flex items-center justify-center">
+                            <Eye size={24} className="text-muted-foreground" />
                           </div>
-                          <p className="font-medium text-gray-700">
+                          <p className="font-medium text-foreground">
                             Select files to preview
                           </p>
-                          <p className="text-sm text-gray-500 mt-1">
+                          <p className="text-sm text-muted-foreground mt-1">
                             Choose files from the tree to see their content here
                           </p>
                         </div>
@@ -884,10 +873,10 @@ export default function Home() {
                     </Button>
 
                     {previewContent && (
-                      <div className="flex items-center gap-3 px-4 py-2 bg-gray-50/80 backdrop-blur-sm rounded-xl border border-gray-200/60">
+                      <div className="flex items-center gap-3 px-4 py-2 bg-muted border border-border">
                         <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                          <span className="text-sm font-medium text-gray-700">
+                          <div className="w-2 h-2 rounded-full bg-primary"></div>
+                          <span className="text-sm font-medium text-foreground">
                             {selectedFileCount} file
                             {selectedFileCount !== 1 ? "s" : ""}
                             {selections.size > selectedFileCount &&
@@ -900,18 +889,18 @@ export default function Home() {
                               })`}
                           </span>
                         </div>
-                        <div className="h-4 w-px bg-gray-300"></div>
+                        <div className="h-4 w-px bg-border"></div>
                         <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-gray-400"></div>
-                          <span className="text-sm font-medium text-gray-600">
+                          <div className="w-2 h-2 rounded-full bg-muted-foreground"></div>
+                          <span className="text-sm font-medium text-muted-foreground">
                             {previewContent.split("\n").length.toLocaleString()}{" "}
                             lines
                           </span>
                         </div>
-                        <div className="h-4 w-px bg-gray-300"></div>
+                        <div className="h-4 w-px bg-border"></div>
                         <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                          <span className="text-sm font-medium text-gray-600">
+                          <div className="w-2 h-2 rounded-full bg-primary"></div>
+                          <span className="text-sm font-medium text-muted-foreground">
                             ~
                             {Math.ceil(
                               previewContent.length / 4

@@ -11,8 +11,15 @@
     "start": "next start",
     "electron": "electron .",
     "electron-dev": "NODE_ENV=development electron .",
+    "dev:electron": "concurrently \"npm run dev\" \"wait-on http://localhost:3000 && npm run electron-dev\"",
     "build-electron": "next build && electron-builder",
-    "dist": "npm run build-electron"
+    "build:linux": "next build && electron-builder --linux",
+    "build:windows": "next build && electron-builder --win",
+    "build:mac": "next build && electron-builder --mac",
+    "dist": "npm run build-electron",
+    "dist:linux": "npm run build:linux",
+    "dist:windows": "npm run build:windows",
+    "dist:mac": "npm run build:mac"
   },
   "dependencies": {
     "@emotion/is-prop-valid": "latest",
@@ -52,12 +59,11 @@
     "date-fns": "4.1.0",
     "embla-carousel-react": "8.5.1",
     "framer-motion": "latest",
-    "fs": "latest",
+    "glob-gitignore": "^1.0.15",
     "input-otp": "1.4.1",
     "lucide-react": "^0.454.0",
     "next": "15.2.4",
     "next-themes": "^0.4.4",
-    "path": "latest",
     "react": "^19",
     "react-day-picker": "8.10.1",
     "react-dom": "^19",
@@ -74,11 +80,13 @@
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "concurrently": "^8.2.2",
     "electron": "^37.2.3",
     "electron-builder": "^26.0.12",
     "postcss": "^8.5",
     "tailwindcss": "^3.4.17",
-    "typescript": "^5"
+    "typescript": "^5",
+    "wait-on": "^7.2.0"
   },
   "build": {
     "appId": "com.example.llm-context-builder",
@@ -89,17 +97,37 @@
     "files": [
       "out/**/*",
       "electron/**/*",
+      "public/logo.png",
       "node_modules/**/*"
     ],
     "mac": {
       "icon": "public/logo.png",
-      "category": "public.app-category.developer-tools"
+      "category": "public.app-category.developer-tools",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["arm64"]
+        }
+      ]
     },
     "win": {
-      "icon": "public/logo.png"
+      "icon": "public/logo.png",
+      "target": [
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ]
     },
     "linux": {
-      "icon": "public/logo.png"
+      "icon": "public/logo.png",
+      "target": [
+        {
+          "target": "deb",
+          "arch": ["x64"]
+        }
+      ],
+      "category": "Development"
     }
   }
 }
