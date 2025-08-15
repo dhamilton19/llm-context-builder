@@ -536,23 +536,6 @@ export default function Home() {
 
   return (
     <div className="h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex flex-col overflow-hidden">
-      {/* Top Navigation Bar */}
-      <div className="bg-gradient-to-r from-blue-500 to-blue-600 border-b border-blue-600/30 shadow-lg flex-shrink-0">
-        <div className="px-4 sm:px-6">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-4">
-              <img
-                src="/logo.png"
-                alt="LLM Context Builder"
-                className="w-8 h-8 rounded-lg"
-              />
-              <h1 className="text-xl font-semibold tracking-tight text-gray-800">
-                LLM Context Builder
-              </h1>
-            </div>
-          </div>
-        </div>
-      </div>
 
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Error Banner */}
