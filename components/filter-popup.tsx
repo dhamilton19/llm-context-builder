@@ -29,14 +29,76 @@ export function FilterPopup({
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
       <SheetTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          className={`relative font-medium border transition-all duration-200 ${
-            hasActiveFilters 
-              ? "border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100" 
-              : "border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50"
-          }`}
+        <button
+          className="relative font-medium text-sm transition-all duration-150 flex items-center"
+          style={{
+            padding: '8px 16px',
+            borderRadius: '8px',
+            background: hasActiveFilters 
+              ? 'linear-gradient(145deg, #dbeafe 0%, #bfdbfe 100%)'
+              : 'linear-gradient(145deg, #f8fafc 0%, #e2e8f0 100%)',
+            border: '1px solid',
+            borderColor: hasActiveFilters ? '#3b82f6' : '#cbd5e1',
+            color: hasActiveFilters ? '#1d4ed8' : '#374151',
+            boxShadow: hasActiveFilters
+              ? `
+                0 1px 2px rgba(59, 130, 246, 0.2),
+                inset 0 1px 0 rgba(255, 255, 255, 0.6),
+                inset 0 -1px 0 rgba(0, 0, 0, 0.05)
+              `
+              : `
+                0 1px 2px rgba(0, 0, 0, 0.05),
+                inset 0 1px 0 rgba(255, 255, 255, 0.5),
+                inset 0 -1px 0 rgba(0, 0, 0, 0.05)
+              `,
+            cursor: 'pointer'
+          }}
+          onMouseEnter={(e) => {
+            if (hasActiveFilters) {
+              e.target.style.background = 'linear-gradient(145deg, #bfdbfe 0%, #93c5fd 100%)';
+            } else {
+              e.target.style.background = 'linear-gradient(145deg, #f1f5f9 0%, #cbd5e1 100%)';
+            }
+            e.target.style.transform = 'translateY(-0.5px)';
+            e.target.style.boxShadow = hasActiveFilters
+              ? `
+                0 2px 4px rgba(59, 130, 246, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.7),
+                inset 0 -1px 0 rgba(0, 0, 0, 0.06)
+              `
+              : `
+                0 2px 4px rgba(0, 0, 0, 0.08),
+                inset 0 1px 0 rgba(255, 255, 255, 0.6),
+                inset 0 -1px 0 rgba(0, 0, 0, 0.06)
+              `;
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.background = hasActiveFilters 
+              ? 'linear-gradient(145deg, #dbeafe 0%, #bfdbfe 100%)'
+              : 'linear-gradient(145deg, #f8fafc 0%, #e2e8f0 100%)';
+            e.target.style.transform = 'translateY(0px)';
+            e.target.style.boxShadow = hasActiveFilters
+              ? `
+                0 1px 2px rgba(59, 130, 246, 0.2),
+                inset 0 1px 0 rgba(255, 255, 255, 0.6),
+                inset 0 -1px 0 rgba(0, 0, 0, 0.05)
+              `
+              : `
+                0 1px 2px rgba(0, 0, 0, 0.05),
+                inset 0 1px 0 rgba(255, 255, 255, 0.5),
+                inset 0 -1px 0 rgba(0, 0, 0, 0.05)
+              `;
+          }}
+          onMouseDown={(e) => {
+            e.target.style.transform = 'translateY(0.5px)';
+            e.target.style.boxShadow = `
+              inset 0 1px 2px rgba(0, 0, 0, 0.1),
+              0 1px 1px rgba(0, 0, 0, 0.05)
+            `;
+          }}
+          onMouseUp={(e) => {
+            e.target.style.transform = 'translateY(-0.5px)';
+          }}
         >
           <Filter size={14} className="mr-2" />
           Filter
@@ -45,10 +107,21 @@ export function FilterPopup({
               {totalActiveFilters}
             </div>
           )}
-        </Button>
+        </button>
       </SheetTrigger>
       
-      <SheetContent side="left" className="w-[440px] border-r border-gray-200">
+      <SheetContent 
+        side="left" 
+        className="w-[440px] border-r border-gray-200"
+        style={{
+          background: 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+          boxShadow: `
+            2px 0 8px rgba(0, 0, 0, 0.1),
+            2px 0 4px rgba(0, 0, 0, 0.06),
+            inset -1px 0 0 rgba(255, 255, 255, 0.8)
+          `
+        }}
+      >
         <SheetHeader className="border-b border-gray-100 pb-4">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">

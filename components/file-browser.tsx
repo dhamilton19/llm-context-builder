@@ -60,7 +60,7 @@ export function FileBrowser({
 
   return (
     <div className="col-span-2 flex flex-col min-h-0">
-      <Card className="flex-1 p-6 bg-white/95 backdrop-blur-xl border-0 shadow-lg rounded-none border-r border-blue-200/60 flex flex-col min-h-0">
+      <Card className="flex-1 p-6 bg-white/98 backdrop-blur-xl border-0 shadow-sm rounded-none border-r border-gray-200 flex flex-col min-h-0">
         {/* Search */}
         <div className="relative mb-2">
           <Search
@@ -73,7 +73,34 @@ export function FileBrowser({
             placeholder="Filter files..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-10 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full pl-10 pr-10 py-3 text-sm rounded-xl focus:outline-none transition-all duration-200"
+            style={{
+              background: 'linear-gradient(145deg, #f8fafc 0%, #ffffff 100%)',
+              border: '1px solid #d1d5db',
+              boxShadow: `
+                inset 0 2px 4px rgba(0, 0, 0, 0.06),
+                inset 0 1px 2px rgba(0, 0, 0, 0.04),
+                0 1px 0 rgba(255, 255, 255, 0.8)
+              `,
+              color: '#374151'
+            }}
+            onFocus={(e) => {
+              e.target.style.boxShadow = `
+                inset 0 2px 4px rgba(59, 130, 246, 0.1),
+                inset 0 1px 2px rgba(59, 130, 246, 0.08),
+                0 0 0 3px rgba(59, 130, 246, 0.1),
+                0 1px 0 rgba(255, 255, 255, 0.8)
+              `;
+              e.target.style.borderColor = '#3b82f6';
+            }}
+            onBlur={(e) => {
+              e.target.style.boxShadow = `
+                inset 0 2px 4px rgba(0, 0, 0, 0.06),
+                inset 0 1px 2px rgba(0, 0, 0, 0.04),
+                0 1px 0 rgba(255, 255, 255, 0.8)
+              `;
+              e.target.style.borderColor = '#d1d5db';
+            }}
           />
           {searchQuery && (
             <button
@@ -103,32 +130,152 @@ export function FileBrowser({
               onFileTypesChange={setSelectedFileTypes}
               availableFiles={allAvailableFiles}
             />
-            <Button
-              variant="secondary"
+            <button
               onClick={expandAll}
-              size="sm"
-              className="font-medium"
+              className="font-medium text-sm transition-all duration-150"
+              style={{
+                padding: '8px 16px',
+                borderRadius: '8px',
+                background: 'linear-gradient(145deg, #f8fafc 0%, #e2e8f0 100%)',
+                border: '1px solid #cbd5e1',
+                color: '#374151',
+                boxShadow: `
+                  0 1px 2px rgba(0, 0, 0, 0.05),
+                  inset 0 1px 0 rgba(255, 255, 255, 0.5),
+                  inset 0 -1px 0 rgba(0, 0, 0, 0.05)
+                `,
+                cursor: 'pointer'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.background = 'linear-gradient(145deg, #f1f5f9 0%, #cbd5e1 100%)';
+                e.target.style.transform = 'translateY(-0.5px)';
+                e.target.style.boxShadow = `
+                  0 2px 4px rgba(0, 0, 0, 0.08),
+                  inset 0 1px 0 rgba(255, 255, 255, 0.6),
+                  inset 0 -1px 0 rgba(0, 0, 0, 0.06)
+                `;
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.background = 'linear-gradient(145deg, #f8fafc 0%, #e2e8f0 100%)';
+                e.target.style.transform = 'translateY(0px)';
+                e.target.style.boxShadow = `
+                  0 1px 2px rgba(0, 0, 0, 0.05),
+                  inset 0 1px 0 rgba(255, 255, 255, 0.5),
+                  inset 0 -1px 0 rgba(0, 0, 0, 0.05)
+                `;
+              }}
+              onMouseDown={(e) => {
+                e.target.style.background = 'linear-gradient(145deg, #e2e8f0 0%, #cbd5e1 100%)';
+                e.target.style.transform = 'translateY(0.5px)';
+                e.target.style.boxShadow = `
+                  inset 0 1px 2px rgba(0, 0, 0, 0.1),
+                  0 1px 1px rgba(0, 0, 0, 0.05)
+                `;
+              }}
+              onMouseUp={(e) => {
+                e.target.style.transform = 'translateY(-0.5px)';
+              }}
             >
               Expand All
-            </Button>
-            <Button
-              variant="secondary"
+            </button>
+            <button
               onClick={collapseAll}
-              size="sm"
-              className="font-medium"
+              className="font-medium text-sm transition-all duration-150"
+              style={{
+                padding: '8px 16px',
+                borderRadius: '8px',
+                background: 'linear-gradient(145deg, #f8fafc 0%, #e2e8f0 100%)',
+                border: '1px solid #cbd5e1',
+                color: '#374151',
+                boxShadow: `
+                  0 1px 2px rgba(0, 0, 0, 0.05),
+                  inset 0 1px 0 rgba(255, 255, 255, 0.5),
+                  inset 0 -1px 0 rgba(0, 0, 0, 0.05)
+                `,
+                cursor: 'pointer'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.background = 'linear-gradient(145deg, #f1f5f9 0%, #cbd5e1 100%)';
+                e.target.style.transform = 'translateY(-0.5px)';
+                e.target.style.boxShadow = `
+                  0 2px 4px rgba(0, 0, 0, 0.08),
+                  inset 0 1px 0 rgba(255, 255, 255, 0.6),
+                  inset 0 -1px 0 rgba(0, 0, 0, 0.06)
+                `;
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.background = 'linear-gradient(145deg, #f8fafc 0%, #e2e8f0 100%)';
+                e.target.style.transform = 'translateY(0px)';
+                e.target.style.boxShadow = `
+                  0 1px 2px rgba(0, 0, 0, 0.05),
+                  inset 0 1px 0 rgba(255, 255, 255, 0.5),
+                  inset 0 -1px 0 rgba(0, 0, 0, 0.05)
+                `;
+              }}
+              onMouseDown={(e) => {
+                e.target.style.background = 'linear-gradient(145deg, #e2e8f0 0%, #cbd5e1 100%)';
+                e.target.style.transform = 'translateY(0.5px)';
+                e.target.style.boxShadow = `
+                  inset 0 1px 2px rgba(0, 0, 0, 0.1),
+                  0 1px 1px rgba(0, 0, 0, 0.05)
+                `;
+              }}
+              onMouseUp={(e) => {
+                e.target.style.transform = 'translateY(-0.5px)';
+              }}
             >
               Collapse All
-            </Button>
+            </button>
           </div>
 
-          <Button
-            variant="secondary"
+          <button
             onClick={toggleAll}
-            size="sm"
-            className="font-medium"
+            className="font-medium text-sm transition-all duration-150"
+            style={{
+              padding: '8px 16px',
+              borderRadius: '8px',
+              background: 'linear-gradient(145deg, #f8fafc 0%, #e2e8f0 100%)',
+              border: '1px solid #cbd5e1',
+              color: '#374151',
+              boxShadow: `
+                0 1px 2px rgba(0, 0, 0, 0.05),
+                inset 0 1px 0 rgba(255, 255, 255, 0.5),
+                inset 0 -1px 0 rgba(0, 0, 0, 0.05)
+              `,
+              cursor: 'pointer'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.background = 'linear-gradient(145deg, #f1f5f9 0%, #cbd5e1 100%)';
+              e.target.style.transform = 'translateY(-0.5px)';
+              e.target.style.boxShadow = `
+                0 2px 4px rgba(0, 0, 0, 0.08),
+                inset 0 1px 0 rgba(255, 255, 255, 0.6),
+                inset 0 -1px 0 rgba(0, 0, 0, 0.06)
+              `;
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.background = 'linear-gradient(145deg, #f8fafc 0%, #e2e8f0 100%)';
+              e.target.style.transform = 'translateY(0px)';
+              e.target.style.boxShadow = `
+                0 1px 2px rgba(0, 0, 0, 0.05),
+                inset 0 1px 0 rgba(255, 255, 255, 0.5),
+                inset 0 -1px 0 rgba(0, 0, 0, 0.05)
+              `;
+            }}
+            onMouseDown={(e) => {
+              e.target.style.background = 'linear-gradient(145deg, #e2e8f0 0%, #cbd5e1 100%)';
+              e.target.style.transform = 'translateY(0.5px)';
+              e.target.style.boxShadow = `
+                inset 0 1px 2px rgba(0, 0, 0, 0.1),
+                0 1px 1px rgba(0, 0, 0, 0.05)
+              `;
+            }}
+            onMouseUp={(e) => {
+              e.target.style.transform = 'translateY(-0.5px)';
+            }}
           >
             {selections.size ? 'Clear All' : 'Select All'}
-          </Button>
+          </button>
         </div>
 
         {/* File Tree */}
