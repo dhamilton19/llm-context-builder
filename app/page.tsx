@@ -213,111 +213,6 @@ export default function Home() {
     );
   }, []);
 
-  const toggleSelect = useCallback(
-    (path: string) => {
-      setSelections((prev) => {
-        const next = new Set(prev);
-
-        if (!tree) return next;
-
-        const findNode = (
-          nodes: FileNodeType[],
-          targetPath: string,
-        ): FileNodeType | null => {
-          for (const node of nodes) {
-            if (node.path === targetPath) return node;
-            if (node.type === 'directory' && node.children) {
-              const found = findNode(node.children, targetPath);
-              if (found) return found;
-            }
-          }
-          return null;
-        };
-
-        const getAllDescendants = (node: FileNodeType): string[] => {
-          if (node.type === 'file') return [node.path];
-
-          const descendants = [node.path];
-          if (node.children) {
-            for (const child of node.children) {
-              descendants.push(...getAllDescendants(child));
-            }
-          }
-          return descendants;
-        };
-
-        const getAllAncestors = (targetPath: string): string[] => {
-          const ancestors: string[] = [];
-          const pathParts = targetPath.split('/').filter(Boolean);
-
-          for (let i = 1; i <= pathParts.length; i++) {
-            const ancestorPath = pathParts.slice(0, i).join('/');
-            if (ancestorPath && ancestorPath !== targetPath) {
-              ancestors.push(ancestorPath);
-            }
-          }
-          return ancestors;
-        };
-
-        const areAllChildrenSelected = (
-          node: FileNodeType,
-          selections: Set<string>,
-        ): boolean => {
-          if (node.type === 'file') return selections.has(node.path);
-          if (!node.children) return true;
-
-          return node.children.every((child) => {
-            if (child.type === 'file') {
-              return selections.has(child.path);
-            } else {
-              return (
-                selections.has(child.path) &&
-                areAllChildrenSelected(child, selections)
-              );
-            }
-          });
-        };
-
-        // Check if this is the root directory
-        let clickedNode: FileNodeType | null = null;
-        if (path === dirPath) {
-          // This is the root directory
-          clickedNode = {
-            name: dirPath.split('/').pop() || dirPath,
-            path: dirPath,
-            type: 'directory',
-            children: tree.children,
-          };
-        } else {
-          clickedNode = findNode(tree.children, path);
-        }
-
-        if (!clickedNode) return next;
-
-        if (next.has(path)) {
-          const toRemove = getAllDescendants(clickedNode);
-          toRemove.forEach((p) => next.delete(p));
-
-          const ancestors = getAllAncestors(path);
-          ancestors.forEach((ancestorPath) => next.delete(ancestorPath));
-        } else {
-          const toAdd = getAllDescendants(clickedNode);
-          toAdd.forEach((p) => next.add(p));
-
-          const ancestors = getAllAncestors(path);
-          for (const ancestorPath of ancestors) {
-            const ancestorNode = findNode(tree.children, ancestorPath);
-            if (ancestorNode && areAllChildrenSelected(ancestorNode, next)) {
-              next.add(ancestorPath);
-            }
-          }
-        }
-
-        return next;
-      });
-    },
-    [tree],
-  );
 
   const expandAll = useCallback(() => {
     if (!tree) return;
@@ -464,6 +359,114 @@ export default function Home() {
       }
     : null;
 
+  const toggleSelect = useCallback(
+    (path: string) => {
+      setSelections((prev) => {
+        const next = new Set(prev);
+
+        if (!tree || !filteredTree) return next;
+
+        const findNode = (
+          nodes: FileNodeType[],
+          targetPath: string,
+        ): FileNodeType | null => {
+          for (const node of nodes) {
+            if (node.path === targetPath) return node;
+            if (node.type === 'directory' && node.children) {
+              const found = findNode(node.children, targetPath);
+              if (found) return found;
+            }
+          }
+          return null;
+        };
+
+        const getAllDescendants = (node: FileNodeType): string[] => {
+          if (node.type === 'file') return [node.path];
+
+          const descendants = [node.path];
+          if (node.children) {
+            for (const child of node.children) {
+              descendants.push(...getAllDescendants(child));
+            }
+          }
+          return descendants;
+        };
+
+        const getAllAncestors = (targetPath: string): string[] => {
+          const ancestors: string[] = [];
+          const pathParts = targetPath.split('/').filter(Boolean);
+
+          for (let i = 1; i <= pathParts.length; i++) {
+            const ancestorPath = pathParts.slice(0, i).join('/');
+            if (ancestorPath && ancestorPath !== targetPath) {
+              ancestors.push(ancestorPath);
+            }
+          }
+          return ancestors;
+        };
+
+        const areAllChildrenSelected = (
+          node: FileNodeType,
+          selections: Set<string>,
+        ): boolean => {
+          if (node.type === 'file') return selections.has(node.path);
+          if (!node.children) return true;
+
+          return node.children.every((child) => {
+            if (child.type === 'file') {
+              return selections.has(child.path);
+            } else {
+              return (
+                selections.has(child.path) &&
+                areAllChildrenSelected(child, selections)
+              );
+            }
+          });
+        };
+
+        // Check if this is the root directory
+        let clickedNode: FileNodeType | null = null;
+        if (path === dirPath) {
+          // This is the root directory - use filtered children
+          clickedNode = {
+            name: dirPath.split('/').pop() || dirPath,
+            path: dirPath,
+            type: 'directory',
+            children: filteredTree.children,
+          };
+        } else {
+          // Find the node in the filtered tree
+          clickedNode = findNode(filteredTree.children, path);
+        }
+
+        if (!clickedNode) return next;
+
+        if (next.has(path)) {
+          const toRemove = getAllDescendants(clickedNode);
+          toRemove.forEach((p) => next.delete(p));
+
+          const ancestors = getAllAncestors(path);
+          ancestors.forEach((ancestorPath) => next.delete(ancestorPath));
+        } else {
+          const toAdd = getAllDescendants(clickedNode);
+          toAdd.forEach((p) => next.add(p));
+
+          const ancestors = getAllAncestors(path);
+          for (const ancestorPath of ancestors) {
+            // Check ancestors in the filtered tree
+            const ancestorNode = findNode(filteredTree.children, ancestorPath);
+            if (ancestorNode && areAllChildrenSelected(ancestorNode, next)) {
+              next.add(ancestorPath);
+            }
+          }
+        }
+
+        return next;
+      });
+    },
+    [tree, filteredTree, dirPath],
+  );
+
   const toggleAll = useCallback(() => {
     if (!filteredTree) return;
 
@@ -594,6 +597,7 @@ export default function Home() {
                   setError(null);
                   setIsManuallyEditing(false);
                   setSelectedFileTypes(new Set());
+                  setSearchQuery('');
                 }}
               />
               <PreviewPanel
